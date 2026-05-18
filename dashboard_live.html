@@ -99,7 +99,7 @@ body{background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,sans
 .fsep{width:1px;height:22px;background:var(--bd);flex-shrink:0}
 .drange{display:flex;align-items:center;gap:6px}
 .dinp{background:var(--sur2);border:1px solid var(--bd);border-radius:7px;
-  padding:4px 8px;color:var(--txt);font-size:.7rem;outline:none;width:110px}
+  padding:4px 8px;color:var(--txt);font-size:.7rem;outline:none;width:130px}
 .dinp:focus{border-color:var(--c2)}
 .fcnt{font-size:.71rem;color:var(--c2);font-weight:600;margin-left:auto;white-space:nowrap}
 .bexp{padding:4px 13px;border-radius:20px;font-size:.71rem;cursor:pointer;
@@ -384,9 +384,9 @@ td{padding:5px 7px;border-bottom:1px solid var(--bd)}tr:last-child td{border-bot
     <div class="fgrp">
       <span class="flbl">&#x1F4C5; ວັນທີ</span>
       <div class="drange">
-        <input class="dinp" type="month" id="dFrom" onchange="updateAll()">
+        <input class="dinp" type="date" id="dFrom" onchange="updateAll()">
         <span style="color:var(--mu);font-size:.7rem">&#x2192;</span>
-        <input class="dinp" type="month" id="dTo" onchange="updateAll()">
+        <input class="dinp" type="date" id="dTo" onchange="updateAll()">
       </div>
     </div>
   </div>
@@ -648,13 +648,20 @@ function normDate(v) {
   if (!v) return '';
   try {
     let d;
-    if (typeof v === 'number') d = new Date((v - 25569) * 86400000);
-    else d = new Date(v);
-    if (isNaN(d)) return '';
+    if (typeof v === 'number') {
+      // Excel serial date
+      d = new Date((v - 25569) * 86400000);
+    } else {
+      // Try parse string date (e.g. "3/15/2025 10:58:47")
+      d = new Date(v);
+    }
+    if (isNaN(d.getTime())) return '';
     let yr = d.getFullYear();
-    if (yr > 2100) yr -= 543;
+    if (yr > 2100) yr -= 543;  // Buddhist calendar
     if (yr < 2020 || yr > 2030) return '';
-    return yr + '-' + String(d.getMonth()+1).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    return yr + '-' + mm + '-' + dd;  // YYYY-MM-DD
   } catch(e) { return ''; }
 }
 function normStaff(v) {
@@ -801,7 +808,8 @@ function resetAll() {
 
 function setDateRange() {
   const dates = ALL_PINS.map(p => p.dt).filter(Boolean).sort();
-  const mn = dates[0] || '2025-01', mx = dates[dates.length-1] || '2026-12';
+  const mn = dates[0] || '2025-01-01';
+  const mx = dates[dates.length-1] || '2026-12-31';
   document.getElementById('dFrom').value = mn;
   document.getElementById('dTo').value   = mx;
   document.getElementById('dFrom').min   = mn;
