@@ -1140,10 +1140,10 @@ function updateTracker(pins) {
 function exportCSV() {
   const pins = getFiltered();
   if (!pins.length) { alert('ບໍ່ມີຂໍ້ມູນ'); return; }
-  const HDR = ['ຊື່ເຈົ້າຂອງ','ເບີໂທ','ເລກບັນຊີ','ເກຣດ','ທຸລະກິດ','ບ້ານ','ສະຖານະ','App LDB','QR','ພະນັກງານ','ວັນທີ','Lat','Lng'];
+  const HDR = ['ຊື່ເຈົ້າຂອງ','ເບີໂທ','ເລກບັນຊີ','ເກຣດ','ທຸລະກິດ','ບ້ານ','ສະຖານະ','App LDB','QR','ພະນັກງານ','ວັນທີ','LAT&LONG'];
   const esc = v => '"' + (v||'').toString().replace(/"/g,'""') + '"';
   const csv = '﻿' + [HDR.map(esc).join(','), ...pins.map(p =>
-    [p.n,p.ph,p.ac,p.g,p.b,p.v,p.s,p.ap,p.qr,p.st,p.dt,p.lat,p.lng].map(esc).join(',')
+    [p.n,p.ph,p.ac,p.g,p.b,p.v,p.s,p.ap,p.qr,p.st,p.dt,(p.lat&&p.lng?p.lat+', '+p.lng:'')].map(esc).join(',')
   )].join('\r\n');
   const a = document.createElement('a');
   a.href     = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
