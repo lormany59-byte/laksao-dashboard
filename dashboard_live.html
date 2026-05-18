@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LAKSAO Bank — Live Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<style>
+:root{
+  --bg:#0f1117;--sur:#1a1d27;--sur2:#22263a;--bd:rgba(255,255,255,.07);
+  --txt:#f0f2ff;--mu:#7b82a8;
+  --c1:#6366f1;--c2:#22d3ee;--c3:#f472b6;--c4:#34d399;--c5:#fb923c;--c6:#a78bfa;
+  --r:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,sans-serif;padding:18px}
+
+/* Setup panel */
+.setup{background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(34,211,238,.1));
+  border:1px solid rgba(99,102,241,.4);border-radius:var(--r);padding:20px 24px;
+  margin-bottom:16px}
+.setup h2{font-size:1rem;font-weight:700;color:var(--c2);margin-bottom:4px}
+.setup p{font-size:.78rem;color:var(--mu);margin-bottom:14px;line-height:1.6}
+.setup-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.url-inp{flex:1;min-width:260px;background:var(--sur2);border:1px solid var(--bd);
+  border-radius:9px;padding:9px 14px;color:var(--txt);font-size:.82rem;outline:none;transition:border-color .15s}
+.url-inp:focus{border-color:var(--c2)}
+.url-inp::placeholder{color:var(--mu)}
+.btn-connect{padding:9px 20px;border-radius:9px;font-size:.8rem;cursor:pointer;
+  border:none;background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  font-weight:600;transition:opacity .15s;white-space:nowrap}
+.btn-connect:hover{opacity:.85}
+.btn-connect:disabled{opacity:.4;cursor:not-allowed}
+.setup-hint{font-size:.7rem;color:var(--mu);margin-top:10px;line-height:1.7}
+.setup-hint b{color:var(--c4)}
+.setup-toggle{font-size:.7rem;color:var(--c1);cursor:pointer;text-decoration:underline;white-space:nowrap}
+
+/* Loading */
+.loading{display:flex;align-items:center;justify-content:center;gap:12px;
+  padding:40px;color:var(--mu);font-size:.9rem}
+.spin{width:24px;height:24px;border:3px solid var(--sur2);border-top-color:var(--c2);
+  border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-box{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
+  border-radius:var(--r);padding:14px 18px;color:#f87171;font-size:.82rem;margin-bottom:14px}
+
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+.hdr h1{font-size:1.35rem;font-weight:700;background:linear-gradient(135deg,var(--c2),var(--c1));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hdr p{color:var(--mu);font-size:.78rem;margin-top:2px}
+.hdr-right{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bdg{background:var(--sur2);border:1px solid var(--bd);padding:4px 11px;border-radius:20px;font-size:.71rem;color:var(--mu)}
+.bdg b{color:var(--c4)}
+.bdg.live{border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.08)}
+.bdg.live b{color:var(--c4);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.btn-refresh{padding:5px 13px;border-radius:20px;font-size:.71rem;cursor:pointer;
+  border:1px solid var(--c2);background:transparent;color:var(--c2);transition:all .15s}
+.btn-refresh:hover{background:var(--c2);color:#0f1117;font-weight:600}
+.btn-refresh:disabled{opacity:.4;cursor:not-allowed}
+
+/* Search */
+.sbar{background:var(--sur);border:1px solid var(--bd);border-radius:var(--r);
+  padding:10px 15px;margin-bottom:10px;display:flex;gap:10px;align-items:center}
+.sw{position:relative;flex:1}
+.sinp{width:100%;background:var(--sur2);border:1px solid var(--bd);border-radius:9px;
+  padding:7px 12px;color:var(--txt);font-size:.82rem;outline:none;transition:border-color .15s}
+.sinp:focus{border-color:var(--c2)}.sinp::placeholder{color:var(--mu)}
+.sdrop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--sur);
+  border:1px solid var(--bd);border-radius:9px;max-height:220px;overflow-y:auto;
+  z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none}
+.si{padding:8px 12px;cursor:pointer;font-size:.78rem;border-bottom:1px solid var(--bd);transition:background .1s}
+.si:last-child{border-bottom:none}.si:hover{background:var(--sur2)}
+.si-name{font-weight:600}.si-sub{color:var(--mu);font-size:.7rem;margin-top:1px}
+.si-g{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700;margin-left:6px}
+.sres{font-size:.72rem;color:var(--mu);white-space:nowrap}
+.sres b{color:var(--c2)}
+
+/* Filter bar */
+.fbar{background:var(--sur);border:1px solid var(--bd);border-radius:var(--r);
+  padding:10px 15px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.fgrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.flbl{font-size:.68rem;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.chip{padding:3px 10px;border-radius:20px;font-size:.71rem;cursor:pointer;
+  border:1px solid var(--bd);background:var(--sur2);color:var(--mu);transition:all .15s;user-select:none}
+.chip:hover{border-color:var(--c1);color:var(--txt)}
+.chip.on{background:var(--c1);border-color:var(--c1);color:#fff;font-weight:600}
+.chip.gA.on{background:#16a34a;border-color:#16a34a}.chip.gB.on{background:#4f46e5;border-color:#4f46e5}
+.chip.gC.on{background:#ea580c;border-color:#ea580c}.chip.gD.on{background:#dc2626;border-color:#dc2626}
+.chip.gN.on{background:#6b7280;border-color:#6b7280}
+.fsep{width:1px;height:22px;background:var(--bd);flex-shrink:0}
+.drange{display:flex;align-items:center;gap:6px}
+.dinp{background:var(--sur2);border:1px solid var(--bd);border-radius:7px;
+  padding:4px 8px;color:var(--txt);font-size:.7rem;outline:none;width:110px}
+.dinp:focus{border-color:var(--c2)}
+.fcnt{font-size:.71rem;color:var(--c2);font-weight:600;margin-left:auto;white-space:nowrap}
+.bexp{padding:4px 13px;border-radius:20px;font-size:.71rem;cursor:pointer;
+  border:1px solid var(--c4);background:transparent;color:var(--c4);transition:all .15s;white-space:nowrap}
+.bexp:hover{background:var(--c4);color:#0f1117;font-weight:600}
+.brst{padding:3px 10px;border-radius:20px;font-size:.71rem;cursor:pointer;
+  border:1px solid var(--c3);background:transparent;color:var(--c3);transition:all .15s}
+.brst:hover{background:var(--c3);color:#fff}
+
+/* KPI */
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+.kc{background:var(--sur);border:1px solid var(--bd);border-radius:var(--r);
+  padding:14px 16px;position:relative;overflow:hidden}
+.kc::before{content:"";position:absolute;top:0;left:0;right:0;height:3px}
+.kc.k1::before{background:linear-gradient(90deg,var(--c1),var(--c2))}
+.kc.k2::before{background:linear-gradient(90deg,var(--c2),var(--c4))}
+.kc.k3::before{background:linear-gradient(90deg,var(--c3),var(--c1))}
+.kc.k4::before{background:linear-gradient(90deg,var(--c5),var(--c3))}
+.klbl{font-size:.67rem;color:var(--mu);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.kval{font-size:1.65rem;font-weight:800;line-height:1;transition:all .3s}
+.ksub{font-size:.67rem;color:var(--mu);margin-top:4px}
+.kico{position:absolute;right:13px;top:50%;transform:translateY(-50%);font-size:1.5rem;opacity:.1}
+
+/* Bento */
+.bento{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:260px;gap:10px}
+.card{background:var(--sur);border:1px solid var(--bd);border-radius:var(--r);
+  padding:14px;display:flex;flex-direction:column;overflow:hidden;transition:transform .2s,border-color .2s}
+.card:hover{transform:translateY(-2px);border-color:rgba(99,102,241,.3)}
+.ctit{font-size:.69rem;font-weight:600;color:var(--mu);text-transform:uppercase;
+  letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:5px;flex-shrink:0}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.cwrap{flex:1;position:relative;min-height:0}
+.s8{grid-column:span 8}.s7{grid-column:span 7}.s6{grid-column:span 6}
+.s5{grid-column:span 5}.s4{grid-column:span 4}.s3{grid-column:span 3}.r2{grid-row:span 2}
+#mapbox{flex:1;border-radius:9px;overflow:hidden;min-height:0}
+.lsw{display:flex;flex-direction:column;gap:3px;background:rgba(15,17,23,.9);
+  border:1px solid rgba(255,255,255,.13);border-radius:9px;padding:5px;backdrop-filter:blur(8px)}
+.lbtn{padding:5px 10px;border-radius:6px;font-size:.69rem;cursor:pointer;
+  border:1px solid transparent;background:transparent;color:#9aa5c8;transition:all .15s;
+  white-space:nowrap;text-align:left;display:block;width:100%}
+.lbtn:hover{background:rgba(255,255,255,.08);color:#f0f2ff}
+.lbtn.on{background:rgba(99,102,241,.25);border-color:#6366f1;color:#c7d2fe;font-weight:600}
+.mleg{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:5px;flex-shrink:0;align-items:center}
+.mli{display:flex;align-items:center;gap:4px;font-size:.67rem;color:var(--mu)}
+.mld{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.zbar{display:flex;align-items:center;gap:5px;flex-shrink:0;margin-bottom:5px;flex-wrap:wrap}
+.zbtn{padding:3px 9px;border-radius:7px;font-size:.69rem;cursor:pointer;
+  border:1px solid var(--bd);background:var(--sur2);color:var(--mu);transition:all .15s}
+.zbtn:hover{border-color:var(--c2);color:var(--txt)}.zbtn.zon{background:rgba(34,211,238,.15);border-color:var(--c2);color:var(--c2)}
+.zbtn.del{border-color:var(--c3);color:var(--c3)}.zbtn.del:hover{background:var(--c3);color:#fff}
+.zinc{font-size:.67rem;color:var(--mu);padding:3px 8px;background:var(--sur2);border-radius:7px;border:1px solid var(--bd)}
+.zinc b{color:var(--c2)}
+.leaflet-popup-content-wrapper{background:#fff;color:#1a1d27;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.22);font-family:"Segoe UI",sans-serif;min-width:220px}
+.leaflet-popup-tip{background:#fff}
+.leaflet-draw-tooltip{background:#1a1d27!important;border:1px solid #6366f1!important;color:#f0f2ff!important;border-radius:7px;font-size:11px}
+.twrap{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--sur2) transparent}
+table{width:100%;border-collapse:collapse;font-size:.73rem}
+th{color:var(--mu);font-weight:600;padding:4px 7px;text-align:left;border-bottom:1px solid var(--bd);position:sticky;top:0;background:var(--sur)}
+td{padding:5px 7px;border-bottom:1px solid var(--bd)}tr:last-child td{border-bottom:none}
+.rb{display:inline-block;width:17px;height:17px;border-radius:5px;background:var(--sur2);text-align:center;line-height:17px;font-size:.63rem;font-weight:700}
+.r1c{background:rgba(251,191,36,.2);color:#fbbf24}.r2c{background:rgba(156,163,175,.2);color:#9ca3af}.r3c{background:rgba(180,100,60,.2);color:#b4643c}
+.slist2{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;overflow-y:auto}
+.srow{display:flex;align-items:center;gap:6px}
+.sbg{flex:1;height:5px;background:var(--sur2);border-radius:3px;overflow:hidden}
+.sfill{height:100%;border-radius:3px;transition:width .5s ease}
+.slbl{font-size:.69rem;color:var(--mu);white-space:nowrap;min-width:72px}
+.sval{font-size:.71rem;font-weight:600;min-width:28px;text-align:right}
+.igrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;align-content:center}
+.iitem{background:var(--sur2);border-radius:9px;padding:11px;text-align:center}
+.inum{font-size:1.3rem;font-weight:800;transition:all .3s}
+.ilbl{font-size:.63rem;color:var(--mu);margin-top:3px}
+.staff-wrap{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;min-height:0}
+.staff-row{display:flex;align-items:center;gap:7px;padding:2px 0}
+.staff-name{font-size:.69rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:90px;max-width:90px}
+.staff-bg{flex:1;height:6px;background:var(--sur2);border-radius:3px;overflow:hidden}
+.staff-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--c1),var(--c2));transition:width .6s}
+.staff-cnt{font-size:.69rem;font-weight:700;color:var(--c2);min-width:28px;text-align:right}
+.ttrack{display:flex;flex-direction:column;gap:9px;flex:1;justify-content:center;min-height:0}
+.trow{display:flex;flex-direction:column;gap:3px}
+.trow-top{display:flex;align-items:center;justify-content:space-between}
+.tlbl{font-size:.71rem;font-weight:500}
+.tpct{font-size:.71rem;font-weight:700}
+.tbar-bg{height:6px;background:var(--sur2);border-radius:3px;overflow:hidden}
+.tbar-fill{height:100%;border-radius:3px;transition:width .6s}
+.trow-bot{display:flex;align-items:center;justify-content:space-between;margin-top:1px}
+.tact{font-size:.67rem;color:var(--mu)}
+.tinp-wrap{display:flex;align-items:center;gap:3px}
+.tinp-wrap span{font-size:.63rem;color:var(--mu)}
+.tinp{width:62px;background:var(--sur2);border:1px solid var(--bd);border-radius:6px;
+  padding:2px 6px;color:var(--txt);font-size:.68rem;text-align:right;outline:none}
+.tinp:focus{border-color:var(--c2)}
+.tover{color:var(--c4)!important}
+@media(max-width:1100px){
+  .kpi{grid-template-columns:repeat(2,1fr)}
+  .s8,.s7,.s6,.s5{grid-column:span 12}.s4,.s3{grid-column:span 6}
+}
+
+/* Fullscreen map */
+.map-card-full {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important;
+  width: 100vw !important; height: 100vh !important;
+  z-index: 9000 !important;
+  border-radius: 0 !important;
+  grid-column: unset !important;
+  grid-row: unset !important;
+  padding: 10px !important;
+}
+.map-card-full #mapbox { border-radius: 0 !important; }
+.map-top-bar { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-bottom:5px; }
+.btn-fs {
+  padding:3px 10px; border-radius:7px; font-size:.69rem; cursor:pointer;
+  border:1px solid var(--bd); background:var(--sur2); color:var(--mu);
+  transition:all .15s; white-space:nowrap; margin-left:auto;
+}
+.btn-fs:hover { border-color:var(--c2); color:var(--txt); }
+.btn-fs.active { background:rgba(34,211,238,.15); border-color:var(--c2); color:var(--c2); }
+/* Popup delete button */
+.popup-del {
+  display:block; width:100%; margin-top:8px; padding:5px 0;
+  border:1px solid #fca5a5; background:rgba(239,68,68,.08);
+  color:#f87171; border-radius:7px; font-size:11px;
+  cursor:pointer; transition:all .15s; text-align:center;
+}
+.popup-del:hover { background:#dc2626; color:#fff; border-color:#dc2626; }
+/* Deleted badge */
+.del-badge {
+  font-size:.68rem; color:var(--mu); padding:2px 8px;
+  background:var(--sur2); border-radius:20px; border:1px solid var(--bd);
+}
+.del-badge b { color:#f87171; }
+
+
+/* Zone style controls */
+.zone-style-bar {
+  display:flex; align-items:center; gap:8px; flex-shrink:0;
+  margin-bottom:5px; flex-wrap:wrap;
+  padding:5px 8px; background:var(--sur2);
+  border:1px solid var(--bd); border-radius:8px;
+}
+.zs-label { font-size:.66rem; color:var(--mu); white-space:nowrap; }
+.color-swatches { display:flex; gap:4px; align-items:center; }
+.csw {
+  width:18px; height:18px; border-radius:4px; cursor:pointer;
+  border:2px solid transparent; transition:all .15s; flex-shrink:0;
+}
+.csw:hover { transform:scale(1.2); }
+.csw.active { border-color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.4); transform:scale(1.15); }
+.csw-custom {
+  width:18px; height:18px; border-radius:4px; cursor:pointer;
+  border:2px solid var(--bd); overflow:hidden; flex-shrink:0;
+  position:relative;
+}
+.csw-custom input[type=color] {
+  position:absolute; top:-4px; left:-4px;
+  width:26px; height:26px; cursor:pointer;
+  border:none; padding:0; opacity:0;
+}
+.csw-custom-preview {
+  width:100%; height:100%; border-radius:2px;
+}
+.zs-sep { width:1px; height:16px; background:var(--bd); }
+.opacity-wrap { display:flex; align-items:center; gap:5px; }
+.opacity-slider {
+  -webkit-appearance:none; appearance:none;
+  width:70px; height:4px; border-radius:2px;
+  background:linear-gradient(to right, var(--c1) 0%, var(--c1) var(--val, 30%), var(--sur2) var(--val, 30%));
+  outline:none; cursor:pointer;
+}
+.opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance:none; width:12px; height:12px;
+  border-radius:50%; background:#fff;
+  border:2px solid var(--c1); cursor:pointer;
+}
+.opacity-val { font-size:.66rem; color:var(--c2); min-width:26px; }
+.zone-label-inp {
+  background:var(--sur2); border:1px solid var(--bd); border-radius:6px;
+  padding:2px 7px; color:var(--txt); font-size:.68rem; width:80px; outline:none;
+}
+.zone-label-inp:focus { border-color:var(--c2); }
+.zone-label-inp::placeholder { color:var(--mu); }
+/* Zone labels on map */
+.zone-tooltip {
+  background:transparent !important; border:none !important;
+  box-shadow:none !important; font-weight:700; font-size:12px;
+  color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.8);
+  pointer-events:none;
+}
+
+
+/* Extended filter chips */
+.chip.fYes.on  { background:#16a34a; border-color:#16a34a; }
+.chip.fNo.on   { background:#dc2626; border-color:#dc2626; }
+.chip.fAll.on  { background:#6366f1; border-color:#6366f1; }
+.fbar-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; width:100%; }
+.fbar-row + .fbar-row { padding-top:8px; border-top:1px solid var(--bd); }
+
+</style>
+</head>
+<body>
+
+<!-- ① Setup Panel -->
+<div class="setup" id="setupPanel">
+  <h2>&#x1F517; ເຊື່ອມຕໍ່ Google Sheets</h2>
+  <p>ໃສ່ URL ຂອງ Google Apps Script Web App ທີ່ Deploy ແລ້ວ.<br>
+     &#x1F4CC; <b>ວິທີ Deploy:</b> Google Sheet → Extensions → Apps Script → ວາງ <code>apps_script.js</code> → Deploy → Web App → Copy URL</p>
+  <div class="setup-row">
+    <input class="url-inp" id="urlInp" type="text"
+      placeholder="https://script.google.com/macros/s/YOUR_ID/exec"
+      value="">
+    <button class="btn-connect" id="btnConnect" onclick="connectSheet()">&#x26A1; ເຊື່ອມຕໍ່</button>
+    <span class="setup-toggle" onclick="toggleSetup()">ຊ່ອນ</span>
+  </div>
+  <div class="setup-hint">
+    &#x2705; URL ຈະຖືກ save ໃນ browser — ຄັ້ງຕໍ່ໄປບໍ່ຕ້ອງໃສ່ໃໝ່<br>
+    &#x1F512; ຂໍ້ມູນ fetch ໂດຍກົງຈາກ Google Sheet ບໍ່ຜ່ານ server ກາງ
+  </div>
+</div>
+
+<!-- Error box -->
+<div class="error-box" id="errBox" style="display:none"></div>
+
+<!-- Loading -->
+<div class="loading" id="loadingBox" style="display:none">
+  <div class="spin"></div>
+  <span id="loadingTxt">ກຳລັງໂຫລດຂໍ້ມູນ...</span>
+</div>
+
+<!-- Dashboard (hidden until data loaded) -->
+<div id="dashWrap" style="display:none">
+
+  <!-- Header -->
+  <div class="hdr">
+    <div>
+      <h1>&#x1F3E6; LAKSAO Bank &mdash; Live Dashboard</h1>
+      <p>&#x1F4CA; ຂໍ້ມູນ Real-time ຈາກ Google Sheets &nbsp;|&nbsp; ຄຳເກີດ / ແຂວງບໍລິຄຳໄຊ</p>
+    </div>
+    <div class="hdr-right">
+      <div class="bdg live">&#x1F7E2; Live &nbsp;<b id="liveTime">-</b></div>
+      <div class="bdg">GPS: <b id="pinBadge">-</b></div>
+      <button class="btn-refresh" id="btnRefresh" onclick="refreshData()">&#x21BB; Refresh</button>
+      <span class="setup-toggle" onclick="toggleSetup()">&#x2699; Settings</span>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="sbar">
+    <span style="font-size:.72rem;color:var(--mu);white-space:nowrap">&#x1F50D;</span>
+    <div class="sw">
+      <input class="sinp" id="searchInp" type="text"
+        placeholder="ຊອກຫາ ຊື່ລູກຄ້າ ຫຼື ເບີໂທ..."
+        autocomplete="off" oninput="onSearch()">
+      <div class="sdrop" id="searchDrop"></div>
+    </div>
+    <div class="sres" id="searchRes" style="display:none">ພົບ <b id="searchCnt">0</b> ຄົນ</div>
+    <button class="brst" onclick="clearSearch()" id="btnClearS" style="display:none">&#x2715;</button>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="fbar" style="flex-direction:column;align-items:stretch;gap:0">
+  <!-- Row 1: Grade + Status + Date -->
+  <div class="fbar-row">
+    <div class="fgrp">
+      <span class="flbl">ເກຣດ</span>
+      <span class="chip gA on" data-f="grade" data-v="A">A</span>
+      <span class="chip gB on" data-f="grade" data-v="B">B</span>
+      <span class="chip gC on" data-f="grade" data-v="C">C</span>
+      <span class="chip gD on" data-f="grade" data-v="D">D</span>
+      <span class="chip gN on" data-f="grade" data-v="N/A">N/A</span>
+    </div>
+    <div class="fsep"></div>
+    <div class="fgrp">
+      <span class="flbl">ສະຖານະ</span>
+      <span class="chip on" data-f="status" data-v="ລູກຄ້າເກົ່າ">ເກົ່າ</span>
+      <span class="chip on" data-f="status" data-v="ລູກຄ້າໃໝ່">ໃໝ່</span>
+      <span class="chip on" data-f="status" data-v="ລູກຄ້າເປົ້າໝາຍ">ເປົ້າໝາຍ</span>
+      <span class="chip on" data-f="status" data-v="ບໍ່ພົບລູກຄ້າ">ບໍ່ພົບ</span>
+      <span class="chip on" data-f="status" data-v="ລະດົມສຳເລັດ">ສຳເລັດ</span>
+      <span class="chip on" data-f="status" data-v="ບໍ່ລະບຸ">ບໍ່ລະບຸ</span>
+    </div>
+    <div class="fsep"></div>
+    <div class="fgrp">
+      <span class="flbl">&#x1F4C5; ວັນທີ</span>
+      <div class="drange">
+        <input class="dinp" type="month" id="dFrom" onchange="updateAll()">
+        <span style="color:var(--mu);font-size:.7rem">&#x2192;</span>
+        <input class="dinp" type="month" id="dTo" onchange="updateAll()">
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Account + App + QR + Biz + Actions -->
+  <div class="fbar-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bd)">
+    <div class="fgrp">
+      <span class="flbl">&#x1F4B3; ບັນຊີ</span>
+      <span class="chip fYes on" data-f="hasAcct" data-v="yes" title="ມີເລກບັນຊີ">&#x2705; ມີ</span>
+      <span class="chip fNo on"  data-f="hasAcct" data-v="no"  title="ຍັງບໍ່ມີ">&#x274C; ຍັງບໍ່ມີ</span>
+    </div>
+    <div class="fsep"></div>
+    <div class="fgrp">
+      <span class="flbl">&#x1F4F1; App LDB</span>
+      <span class="chip fYes on" data-f="hasApp" data-v="yes">&#x2705; ຕັ້ງແລ້ວ</span>
+      <span class="chip fNo on"  data-f="hasApp" data-v="no">&#x274C; ຍັງບໍ່ຕັ້ງ</span>
+      <span class="chip fAll on" data-f="hasApp" data-v="na">&#x2014; ບໍ່ລະບຸ</span>
+    </div>
+    <div class="fsep"></div>
+    <div class="fgrp">
+      <span class="flbl">&#x1F4F2; QR TrustPay</span>
+      <span class="chip fYes on" data-f="hasQR" data-v="yes">&#x2705; ມີ</span>
+      <span class="chip fNo on"  data-f="hasQR" data-v="no">&#x274C; ຍັງບໍ່ມີ</span>
+      <span class="chip fAll on" data-f="hasQR" data-v="na">&#x2014; ບໍ່ລະບຸ</span>
+    </div>
+    <div class="fsep"></div>
+    <div class="fgrp">
+      <span class="flbl">&#x1F3EA; ທຸລະກິດ</span>
+      <span class="chip on"  data-f="biz" data-v="all">ທັງໝົດ</span>
+      <span class="chip"     data-f="biz" data-v="ການຄ້າ">ການຄ້າ</span>
+      <span class="chip"     data-f="biz" data-v="ບໍລິການ">ບໍລິການ</span>
+      <span class="chip"     data-f="biz" data-v="ອາຫານ">ອາຫານ</span>
+      <span class="chip"     data-f="biz" data-v="ປະຊາຊົນທົ່ວໄປ">ທົ່ວໄປ</span>
+    </div>
+    <div class="fsep"></div>
+    <span class="fcnt" style="margin-left:auto;white-space:nowrap">ສະແດງ: <span id="fcnt">-</span></span>
+    <button class="bexp" onclick="exportCSV()">&#x2B07; Export</button>
+    <button class="brst" onclick="resetAll()">&#x21BA; Reset</button>
+  </div>
+</div>
+
+  <!-- KPI -->
+  <div class="kpi">
+    <div class="kc k1"><div class="klbl">ລູກຄ້າ (filtered)</div><div class="kval" id="kv1" style="color:var(--c2)">-</div><div class="ksub" id="kv1sub">-</div><div class="kico">&#x1F465;</div></div>
+    <div class="kc k2"><div class="klbl">ເກຣດ A</div><div class="kval" id="kv2" style="color:var(--c4)">-</div><div class="ksub">ລູກຄ້າຊັ້ນດີ</div><div class="kico">&#x2B50;</div></div>
+    <div class="kc k3"><div class="klbl">ເກຣດ B</div><div class="kval" id="kv3" style="color:var(--c6)">-</div><div class="ksub">ລູກຄ້າດີ</div><div class="kico">&#x1F3C5;</div></div>
+    <div class="kc k4"><div class="klbl">Pins GPS</div><div class="kval" id="kv4" style="color:var(--c5)">-</div><div class="ksub">ມີຂໍ້ມູນ GPS</div><div class="kico">&#x1F4CD;</div></div>
+  </div>
+
+  <!-- Bento -->
+  <div class="bento">
+    <!-- Map -->
+    <div class="card s8 r2">
+      <div class=map-top-bar>
+        <span class=dot style=background:var(--c2)></span>
+        <span style=font-size:.69rem;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.5px>&#x1F5FA; ແຜນທີ່ GPS Pins</span>
+        <span style=font-size:.65rem;color:var(--c2);margin-left:4px id=mapCount>-</span>
+        <span class=del-badge id=delBadge style=display:none>ລຶບ: <b id=delCnt>0</b> pins <span style=cursor:pointer;color:var(--c4);margin-left:4px onclick=restoreDeleted() title=ຄືນ>&#x21A9;</span></span>
+        <button class=btn-fs id=btnFs onclick=toggleFullscreen() title=ເຕັມຈໍ>&#x26F6; ເຕັມຈໍ</button>
+      </div>
+      <div class=mleg>
+        <div class="mli"><div class="mld" style="background:#16a34a"></div>A</div>
+        <div class="mli"><div class="mld" style="background:#4f46e5"></div>B</div>
+        <div class="mli"><div class="mld" style="background:#ea580c"></div>C</div>
+        <div class="mli"><div class="mld" style="background:#dc2626"></div>D</div>
+        <div class="mli"><div class="mld" style="background:#6b7280"></div>N/A</div>
+      </div>
+          <!-- Zone style controls -->
+    <div class="zone-style-bar">
+      <span class="zs-label">&#x1F3A8; ສີ:</span>
+      <div class="color-swatches">
+        <div class="csw active" data-color="#6366f1" style="background:#6366f1" onclick="setZoneColor('#6366f1',this)" title="ມ່ວງ"></div>
+        <div class="csw" data-color="#ef4444" style="background:#ef4444" onclick="setZoneColor('#ef4444',this)" title="ແດງ"></div>
+        <div class="csw" data-color="#f97316" style="background:#f97316" onclick="setZoneColor('#f97316',this)" title="ສົ້ມ"></div>
+        <div class="csw" data-color="#eab308" style="background:#eab308" onclick="setZoneColor('#eab308',this)" title="ເຫຼືອງ"></div>
+        <div class="csw" data-color="#22c55e" style="background:#22c55e" onclick="setZoneColor('#22c55e',this)" title="ຂຽວ"></div>
+        <div class="csw" data-color="#06b6d4" style="background:#06b6d4" onclick="setZoneColor('#06b6d4',this)" title="ຟ້າ"></div>
+        <div class="csw" data-color="#ec4899" style="background:#ec4899" onclick="setZoneColor('#ec4899',this)" title="ບົວ"></div>
+        <div class="csw-custom" title="ສີເອງ">
+          <div class="csw-custom-preview" id="customColorPreview" style="background:#a855f7"></div>
+          <input type="color" id="customColor" value="#a855f7" oninput="setZoneColor(this.value,null,true)">
+        </div>
+      </div>
+      <div class="zs-sep"></div>
+      <div class="opacity-wrap">
+        <span class="zs-label">ຄວາມໂປ່ງ:</span>
+        <input type="range" class="opacity-slider" id="zoneOpacity" min="0" max="60" value="15"
+          oninput="updateZoneOpacity(this.value)" style="--val:25%">
+        <span class="opacity-val" id="opacityVal">15%</span>
+      </div>
+      <div class="zs-sep"></div>
+      <input class="zone-label-inp" id="zoneLabelInp" type="text" placeholder="ຊື່ Zone...">
+    </div>
+<div class="zbar">
+        <button class="zbtn" id="btnRect"   onclick="startDraw('rect')">&#x25A1; ສີ່ຫຼ່ຽມ</button>
+        <button class="zbtn" id="btnPoly"   onclick="startDraw('poly')">&#x2B21; Polygon</button>
+        <button class="zbtn" id="btnCircle" onclick="startDraw('circ')">&#x25CB; ວົງ</button>
+        <button class="zbtn del" id="btnClear" onclick="clearZone()" style="display:none">&#x2715; Clear Zone</button>
+        <div class="zinc" id="zoneInfo" style="display:none">Zone: <b id="zoneCnt">0</b></div>
+      </div>
+      <div id="mapbox"></div>
+    </div>
+    <div class="card s4"><div class="ctit"><span class="dot" style="background:var(--c1)"></span>ເກຣດ ລູກຄ້າ</div><div class="cwrap"><canvas id="gradeChart"></canvas></div></div>
+    <div class="card s4"><div class="ctit"><span class="dot" style="background:var(--c4)"></span>ສະຖານະ ລູກຄ້າ</div><div class="cwrap"><canvas id="statusChart"></canvas></div></div>
+    <div class="card s7"><div class="ctit"><span class="dot" style="background:var(--c2)"></span>ແນວໂນ້ມລາຍເດືອນ</div><div class="cwrap"><canvas id="monthlyChart"></canvas></div></div>
+    <div class="card s3">
+      <div class="ctit"><span class="dot" style="background:var(--c3)"></span>QR &amp; App</div>
+      <div class="igrid">
+        <div class="iitem"><div class="inum" id="qrY" style="color:var(--c4)">-</div><div class="ilbl">QR ມີ</div></div>
+        <div class="iitem"><div class="inum" id="qrN" style="color:var(--c3)">-</div><div class="ilbl">QR ບໍ່ມີ</div></div>
+        <div class="iitem"><div class="inum" id="appY" style="color:var(--c2)">-</div><div class="ilbl">App ມີ</div></div>
+        <div class="iitem"><div class="inum" id="appN" style="color:var(--mu)">-</div><div class="ilbl">App ບໍ່ມີ</div></div>
+      </div>
+    </div>
+    <div class="card s5"><div class="ctit"><span class="dot" style="background:var(--c5)"></span>ປະເພດທຸລະກິດ</div><div class="cwrap"><canvas id="bizChart"></canvas></div></div>
+    <div class="card s4"><div class="ctit"><span class="dot" style="background:var(--c6)"></span>ບ້ານ Top 10</div><div class="twrap"><table><thead><tr><th>#</th><th>ບ້ານ</th><th>ລູກຄ້າ</th></tr></thead><tbody id="vilTbl"></tbody></table></div></div>
+    <div class="card s3"><div class="ctit"><span class="dot" style="background:var(--c5)"></span>ສັດສ່ວນ ເກຣດ</div><div class="slist2" id="gradeStat"></div></div>
+    <div class="card s4"><div class="ctit"><span class="dot" style="background:var(--c2)"></span>&#x1F3C6; ພະນັກງານ Top 15</div><div class="staff-wrap" id="staffBoard"></div></div>
+    <div class="card s6"><div class="ctit"><span class="dot" style="background:var(--c2)"></span>&#x1F3AF; Target Tracker<span style="margin-left:auto;font-size:.62rem;color:var(--mu)">ແກ້ Target ໄດ້</span></div><div class="ttrack" id="trackerWrap"></div></div>
+  </div>
+</div><!-- /dashWrap -->
+
+<script>
+// ══════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════
+const LS_URL_KEY  = 'laksao_sheets_url';
+const LS_PINS_KEY = 'laksao_pins_cache';
+let   ALL_PINS    = [];
+let   searchMatches = null;
+
+// ── Startup ──────────────────────────────────────────
+window.onload = function() {
+  const saved = localStorage.getItem(LS_URL_KEY);
+  if (saved) {
+    document.getElementById('urlInp').value = saved;
+    connectSheet();
+  }
+};
+
+function toggleSetup() {
+  const p = document.getElementById('setupPanel');
+  p.style.display = p.style.display === 'none' ? '' : 'none';
+}
+
+// ══════════════════════════════════════════════════════
+//  DATA FETCH + PROCESS
+// ══════════════════════════════════════════════════════
+async function connectSheet() {
+  const url = document.getElementById('urlInp').value.trim();
+  if (!url) { showErr('ກະລຸນາໃສ່ URL'); return; }
+  localStorage.setItem(LS_URL_KEY, url);
+  await fetchData(url);
+}
+
+async function refreshData() {
+  const url = localStorage.getItem(LS_URL_KEY);
+  if (!url) { toggleSetup(); return; }
+  await fetchData(url);
+}
+
+async function fetchData(url) {
+  setLoading(true, 'ກຳລັງໂຫລດຂໍ້ມູນຈາກ Google Sheets...');
+  hideErr();
+  document.getElementById('btnRefresh').disabled = true;
+  document.getElementById('btnConnect').disabled  = true;
+
+  try {
+    // Add timestamp to bust cache
+    const res  = await fetch(url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now());
+    const json = await res.json();
+
+    if (!json.ok) throw new Error(json.error || 'Apps Script returned error');
+
+    setLoading(true, 'ກຳລັງປະມວນຜົນ ' + json.count.toLocaleString() + ' records...');
+    await sleep(50);  // let UI update
+
+    ALL_PINS = processRaw(json.data);
+    localStorage.setItem(LS_PINS_KEY, JSON.stringify({ t: Date.now(), pins: ALL_PINS }));
+
+    document.getElementById('liveTime').textContent =
+      new Date(json.updated || Date.now()).toLocaleTimeString('lo-LA');
+    document.getElementById('pinBadge').textContent = ALL_PINS.length.toLocaleString();
+
+    setLoading(false);
+    document.getElementById('dashWrap').style.display = '';
+    toggleSetup(); // auto-hide setup after connect
+    initCharts();
+    initMap();
+    setDateRange();
+    updateAll();
+
+  } catch(e) {
+    setLoading(false);
+    showErr('&#x274C; ໂຫລດບໍ່ໄດ້: ' + e.message +
+      '<br><small>ກວດສອບ: 1) URL ຖືກຕ້ອງ 2) Deploy ເປັນ "Anyone" 3) Sheet ຊື່ຖືກ</small>');
+  }
+
+  document.getElementById('btnRefresh').disabled = false;
+  document.getElementById('btnConnect').disabled  = false;
+}
+
+// ── Data Processing — Raw column mapping ─────────────
+// Normalize string: strip spaces, zero-width chars, lowercase
+function cln(s) {
+  return String(s||'').replace(/[\s\u200b\u200c\u200d\u00a0\ufeff]/g,'').toLowerCase();
+}
+
+// Find value in a raw row by trying multiple column name variants
+function fv(row, names) {
+  const keys = Object.keys(row);
+  for (const name of names) {
+    const k = keys.find(k2 => cln(k2) === cln(name));
+    if (k !== undefined) {
+      const v = row[k];
+      const s = (v === null || v === undefined) ? '' : String(v).trim();
+      if (s) return s;
+    }
+  }
+  return '';
+}
+
+function normGrade(v) {
+  if (!v) return 'N/A';
+  v = String(v).toUpperCase().trim();
+  if (v.includes('A')) return 'A';
+  if (v.includes('B') && !v.includes('BIZ')) return 'B';
+  if (v.includes('C')) return 'C';
+  if (v.includes('D')) return 'D';
+  return 'N/A';
+}
+function normStatus(v) {
+  if (!v) return 'ບໍ່ລະບຸ';
+  v = String(v).trim();
+  if (v.includes('ບໍ່ພົບ') || v.includes('ບໍພົບ')) return 'ບໍ່ພົບລູກຄ້າ';
+  if (v.includes('ໃໝ່') || v.includes('ໃຫມ່'))      return 'ລູກຄ້າໃໝ່';
+  if (v.includes('ເກົ່າ'))                            return 'ລູກຄ້າເກົ່າ';
+  if (v.includes('ສຳເລັດ') && !v.includes('ບໍ່'))    return 'ລະດົມສຳເລັດ';
+  if (v.includes('ເປົ້າ'))                           return 'ລູກຄ້າເປົ້າໝາຍ';
+  return 'ບໍ່ລະບຸ';
+}
+function normYN(v) {
+  if (!v) return '';
+  v = String(v).trim();
+  if (/^ມ[ີິ]+/.test(v)) return 'ມີ';
+  if (v.includes('ບໍ່ມີ') || v.includes('ບໍ')) return 'ບໍ່ມີ';
+  return v;
+}
+function parseLL(v) {
+  if (!v) return null;
+  const m = String(v).match(/([-+]?\d+\.?\d*)/g);
+  if (m && m.length >= 2) {
+    const la = parseFloat(m[0]), ln = parseFloat(m[1]);
+    if (la > 14 && la < 23 && ln > 100 && ln < 108) return [la, ln];
+  }
+  return null;
+}
+function normDate(v) {
+  if (!v) return '';
+  try {
+    let d;
+    if (typeof v === 'number') d = new Date((v - 25569) * 86400000);
+    else d = new Date(v);
+    if (isNaN(d)) return '';
+    let yr = d.getFullYear();
+    if (yr > 2100) yr -= 543;
+    if (yr < 2020 || yr > 2030) return '';
+    return yr + '-' + String(d.getMonth()+1).padStart(2,'0');
+  } catch(e) { return ''; }
+}
+function normStaff(v) {
+  if (!v) return '';
+  return String(v).replace(/LDເກຣດ\s*B/g,'LDB').replace(/^(ທ່ານ|ທ\.|ທ\s|ນ\.|ນ\s)/,'').trim().slice(0,25);
+}
+function jitter(v, amt) { amt = amt || 0.0004; return v + (Math.random() - 0.5) * amt; }
+
+function processRaw(rows) {
+  // ── Deduplicate rows ──────────────────────────────
+  const dedupSeen = new Set();
+  rows = rows.filter(r => {
+    const ll   = fv(r, ['LAT&LONG','LATLONG']);
+    const name = fv(r, ['ຊື່ເຈົ້າຂອງເຮືອນ/ເຈົ້າຂອງທຸລະກິດ','owner']);
+    const ph   = fv(r, ['ເບິໂທ','ເບີໂທ','phone']);
+    const ac   = fv(r, ['ເລກບັນຊີ','account']);
+    const key  = (ll + '|' + name + '|' + ph + '|' + ac).toLowerCase().replace(/\s/g,'');
+    if (!key || key === '|||') return true;
+    if (dedupSeen.has(key)) return false;
+    dedupSeen.add(key);
+    return true;
+  });
+  console.log('After dedup:', rows.length, 'rows');
+
+  const pins = [];
+  const seen = {};
+  rows.forEach(r => {
+    // ── GPS ──────────────────────────────────────────
+    const ll = parseLL(fv(r, ['LAT&LONG','LATLONG','lat&long','ຕຳແໜ່ງ']));
+    if (!ll) return;
+    const [la0, ln0] = ll;
+    const key = Math.round(la0*1e5)+','+Math.round(ln0*1e5);
+    const cnt = seen[key] = (seen[key]||0)+1;
+
+    // ── Fields with fuzzy column matching ────────────
+    const grade   = fv(r, ['ເກຣດ','grade','Grade']);
+    const biz     = fv(r, ['ປະເພດທຸລະກິດ','ປະເພດທຸລະກິດ','biz']);
+    const owner   = fv(r, ['ຊື່ເຈົ້າຂອງເຮືອນ/ເຈົ້າຂອງທຸລະກິດ','ຊືເຈາຂອງເຮືອນ/ເຈາຂອງທຸລະກິດ','owner','ຊື່ເຈົ້າຂອງ']);
+    const village = fv(r, ['ບ້ານ','village','ບານ']);
+    const status  = fv(r, ['ໃໝ່/ເກົ່າ','ໃໝ/ເກົາ','ໃໝ່/ເກົ່າ','status']);
+    const phone   = fv(r, ['ເບິໂທ','ເບີໂທ','ເບິໂທ','phone','tel','ເບີ']);
+    const account = fv(r, ['ເລກບັນຊີ','account','ເລກບນຊ']);
+    const appLDB  = fv(r, ['LDເກຣດBTRUST','LDBTrust','LDB TRUST','LDBTrust','app','LDBTrust','ldbtrust']);
+    const qr      = fv(r, ['QRTRUSTPAY','QRTrustPay','QR TRUSTPAY','qr','trustpay']);
+    const staff   = fv(r, ['ພະນັກງານຜູ້ລະດົມ','ພະນກງານຜູລະດມ','staff','ພະນັກງານ']);
+    const date    = fv(r, ['ວັນທີເດືອນປີ','ວນທເດອນປ','date','ວັນທີ']);
+
+    pins.push({
+      lat: parseFloat((cnt>1?jitter(la0, 0.0003 * Math.sqrt(cnt)):la0).toFixed(6)),
+      lng: parseFloat((cnt>1?jitter(ln0, 0.0003 * Math.sqrt(cnt)):ln0).toFixed(6)),
+      g:   normGrade(grade),
+      b:   biz.trim() || 'ບໍ່ລະບຸ',
+      n:   owner.trim().slice(0,30),
+      v:   village.trim(),
+      s:   normStatus(status),
+      ph:  phone.replace(/\D/g,'').slice(0,12),
+      ac:  account.trim(),
+      ap:  normYN(appLDB),
+      qr:  normYN(qr),
+      st:  normStaff(staff),
+      dt:  normDate(date),
+    });
+  });
+  return pins;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ══════════════════════════════════════════════════════
+//  FILTER STATE
+// ══════════════════════════════════════════════════════
+const FS_STATUS_INIT = ['ລູກຄ້າເກົ່າ','ລູກຄ້າໃໝ່','ລູກຄ້າເປົ້າໝາຍ','ບໍ່ພົບລູກຄ້າ','ລະດົມສຳເລັດ','ບໍ່ລະບຸ'];
+const FS = {
+  grade:   new Set(['A','B','C','D','N/A']),
+  status:  new Set(FS_STATUS_INIT),
+  hasAcct: new Set(['yes','no']),
+  hasApp:  new Set(['yes','no','na']),
+  hasQR:   new Set(['yes','no','na']),
+  biz:     new Set(['all']),
+};
+
+function pinAcctKey(p)  { return p.ac && p.ac.trim() ? 'yes' : 'no'; }
+function pinAppKey(p)   { return p.ap==='ມີ' ? 'yes' : p.ap==='ບໍ່ມີ' ? 'no' : 'na'; }
+function pinQRKey(p)    { return p.qr==='ມີ' ? 'yes' : p.qr==='ບໍ່ມີ' ? 'no' : 'na'; }
+
+function getFiltered() {
+  const dFrom = document.getElementById('dFrom') ? document.getElementById('dFrom').value : '';
+  const dTo   = document.getElementById('dTo')   ? document.getElementById('dTo').value   : '';
+  const bizAll = FS.biz.has('all');
+  let pins = ALL_PINS.filter(p => {
+    if (!FS.grade.has(p.g))          return false;
+    if (!FS.status.has(p.s))         return false;
+    if (!FS.hasAcct.has(pinAcctKey(p))) return false;
+    if (!FS.hasApp.has(pinAppKey(p)))   return false;
+    if (!FS.hasQR.has(pinQRKey(p)))     return false;
+    if (!bizAll && !FS.biz.has(p.b))    return false;
+    if (p.dt && dFrom && dTo && (p.dt < dFrom || p.dt > dTo)) return false;
+    return true;
+  });
+  if (searchMatches) pins = pins.filter(p => searchMatches.has(p));
+  return pins;
+}
+
+document.querySelectorAll('.chip[data-f]').forEach(c => {
+  c.addEventListener('click', () => {
+    const f = c.dataset.f, v = c.dataset.v;
+    if (f === 'biz') {
+      // biz: single-select — 'all' = reset, others = exclusive pick
+      document.querySelectorAll('.chip[data-f="biz"]').forEach(x => x.classList.remove('on'));
+      if (v === 'all' || FS.biz.has(v)) {
+        FS.biz = new Set(['all']);
+        document.querySelector('.chip[data-f="biz"][data-v="all"]').classList.add('on');
+      } else {
+        FS.biz = new Set([v]);
+        c.classList.add('on');
+      }
+    } else {
+      if (FS[f] === undefined) return;
+      if (FS[f].has(v)) { if (FS[f].size === 1) return; FS[f].delete(v); c.classList.remove('on'); }
+      else { FS[f].add(v); c.classList.add('on'); }
+    }
+    updateAll();
+  });
+});
+
+function resetAll() {
+  FS.grade   = new Set(['A','B','C','D','N/A']);
+  FS.status  = new Set(FS_STATUS_INIT);
+  FS.hasAcct = new Set(['yes','no']);
+  FS.hasApp  = new Set(['yes','no','na']);
+  FS.hasQR   = new Set(['yes','no','na']);
+  FS.biz     = new Set(['all']);
+  document.querySelectorAll('.chip[data-f]').forEach(c => {
+    if (c.dataset.f === 'biz') {
+      c.classList.toggle('on', c.dataset.v === 'all');
+    } else {
+      c.classList.add('on');
+    }
+  });
+  setDateRange();
+  clearSearch();
+  updateAll();
+}
+
+function setDateRange() {
+  const dates = ALL_PINS.map(p => p.dt).filter(Boolean).sort();
+  const mn = dates[0] || '2025-01', mx = dates[dates.length-1] || '2026-12';
+  document.getElementById('dFrom').value = mn;
+  document.getElementById('dTo').value   = mx;
+  document.getElementById('dFrom').min   = mn;
+  document.getElementById('dTo').max     = mx;
+}
+
+// ══════════════════════════════════════════════════════
+//  SEARCH
+// ══════════════════════════════════════════════════════
+let stimer = null;
+function onSearch() { clearTimeout(stimer); stimer = setTimeout(doSearch, 250); }
+function doSearch() {
+  const q = document.getElementById('searchInp').value.trim().toLowerCase();
+  const drop = document.getElementById('searchDrop');
+  if (!q) { clearSearch(); return; }
+  const hits = ALL_PINS.filter(p =>
+    (p.n && p.n.toLowerCase().includes(q)) || (p.ph && p.ph.includes(q))
+  ).slice(0, 20);
+  document.getElementById('searchCnt').textContent = hits.length;
+  document.getElementById('searchRes').style.display  = hits.length ? '' : 'none';
+  document.getElementById('btnClearS').style.display  = '';
+  if (!hits.length) { drop.style.display = 'none'; searchMatches = new Set(); updateAll(); return; }
+  drop.innerHTML = hits.map((p, i) => {
+    const col = GC[p.g] || '#6b7280';
+    return "<div class='si' onclick='selectPin(" + i + ")'>"
+      + "<div class='si-name'>" + (p.n||'ບໍ່ລະບຸ') + "<span class='si-g' style='background:" + col + "22;color:" + col + "'>" + p.g + "</span></div>"
+      + "<div class='si-sub'>" + (p.ph||'') + (p.ph&&p.v?' · ':'') + (p.v||'') + "</div></div>";
+  }).join('');
+  drop._hits = hits;
+  drop.style.display = 'block';
+  searchMatches = new Set(hits);
+  updateAll();
+}
+function selectPin(i) {
+  const p = document.getElementById('searchDrop')._hits[i];
+  document.getElementById('searchDrop').style.display = 'none';
+  if (!p) return;
+  map.flyTo([p.lat, p.lng], 18, { animate: true, duration: 1.2 });
+  setTimeout(() => {
+    cluster.eachLayer(mk => {
+      if (mk.getLatLng && Math.abs(mk.getLatLng().lat - p.lat) < 0.0001) mk.openPopup();
+    });
+  }, 1400);
+}
+function clearSearch() {
+  document.getElementById('searchInp').value = '';
+  document.getElementById('searchDrop').style.display  = 'none';
+  document.getElementById('searchRes').style.display   = 'none';
+  document.getElementById('btnClearS').style.display   = 'none';
+  searchMatches = null;
+  updateAll();
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.sw')) document.getElementById('searchDrop').style.display = 'none';
+});
+
+// ══════════════════════════════════════════════════════
+//  MAP
+// ══════════════════════════════════════════════════════
+const GC = { A:'#16a34a', B:'#4f46e5', C:'#ea580c', D:'#dc2626', 'N/A':'#6b7280' };
+let map, cluster, activeHandler = null, activeZone = null;
+
+function initMap() {
+  if (map) return;  // already initialized
+  map = L.map('mapbox', { zoomControl: true }).setView([18.19, 104.97], 12);
+  const tileSat    = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution:'Tiles &copy; Esri', maxZoom:19, maxNativeZoom:18 });
+  const tileLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { attribution:'Labels &copy; Esri', maxZoom:19, maxNativeZoom:18 });
+  const tileStreet = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution:'&copy; OSM &copy; CARTO', maxZoom:19 });
+  tileSat.addTo(map); tileLabels.addTo(map);
+
+  const lswCtrl = L.control({ position: 'topright' });
+  lswCtrl.onAdd = function() {
+    const d = L.DomUtil.create('div', 'lsw');
+    d.innerHTML =
+      "<button class='lbtn on' id='lbSat'  onclick=\"setLayer('sat')\">&#x1F6F0; ດາວທຽມ</button>" +
+      "<button class='lbtn'    id='lbHy'   onclick=\"setLayer('hybrid')\">&#x1F5FA;+&#x1F520; Hybrid</button>" +
+      "<button class='lbtn'    id='lbStr'  onclick=\"setLayer('street')\">&#x1F5FA; ແຜນທີ່</button>";
+    L.DomEvent.disableClickPropagation(d); return d;
+  };
+  lswCtrl.addTo(map);
+
+  window.setLayer = function(t) {
+    [tileSat, tileLabels, tileStreet].forEach(l => { try { map.removeLayer(l); } catch(e) {} });
+    document.querySelectorAll('.lbtn').forEach(b => b.classList.remove('on'));
+    if (t === 'sat') { tileSat.addTo(map); tileLabels.addTo(map); document.getElementById('lbSat').classList.add('on'); }
+    else if (t === 'hybrid') { tileSat.addTo(map); tileLabels.addTo(map); document.getElementById('lbHy').classList.add('on'); }
+    else { tileStreet.addTo(map); document.getElementById('lbStr').classList.add('on'); }
+  };
+
+  cluster = L.markerClusterGroup({
+    disableClusteringAtZoom: 17,
+    maxClusterRadius: z => z>=16?10:z>=14?35:z>=12?60:90,
+    spiderfyOnMaxZoom: true, spiderfyDistanceMultiplier: 2.5,
+    chunkedLoading: true, chunkInterval: 100
+  });
+  map.addLayer(cluster);
+
+  const drawnItems = new L.FeatureGroup(); map.addLayer(drawnItems);
+  // zSO is now dynamic — see getZSO()
+
+  window.startDraw = function(t) {
+    if (activeHandler) { activeHandler.disable(); activeHandler = null; }
+    clearZone();
+    ['btnRect','btnPoly','btnCircle'].forEach(id => document.getElementById(id).classList.remove('zon'));
+    const id = t==='rect'?'btnRect':t==='poly'?'btnPoly':'btnCircle';
+    document.getElementById(id).classList.add('zon');
+    if (t==='rect') activeHandler = new L.Draw.Rectangle(map, {shapeOptions:getZSO()});
+    else if (t==='poly') activeHandler = new L.Draw.Polygon(map, {shapeOptions:getZSO(), allowIntersection:false});
+    else activeHandler = new L.Draw.Circle(map, {shapeOptions:getZSO()});
+    activeHandler.enable();
+  };
+
+  window.clearZone = function() {
+    drawnItems.clearLayers(); activeZone = null;
+    if (activeHandler) { activeHandler.disable(); activeHandler = null; }
+    ['btnRect','btnPoly','btnCircle'].forEach(id => document.getElementById(id).classList.remove('zon'));
+    document.getElementById('btnClear').style.display = 'none';
+    document.getElementById('zoneInfo').style.display = 'none';
+    updateAll();
+  };
+
+  window.ptInZone = function(lat, lng, layer) {
+    const ll = L.latLng(lat, lng);
+    if (layer instanceof L.Circle) return layer.getLatLng().distanceTo(ll) <= layer.getRadius();
+    const pts = layer.getLatLngs()[0]; let inside = false, n = pts.length;
+    for (let i=0,j=n-1;i<n;j=i++) {
+      const xi=pts[i].lat,yi=pts[i].lng,xj=pts[j].lat,yj=pts[j].lng;
+      if (((yi>lng)!==(yj>lng))&&(lat<(xj-xi)*(lng-yi)/(yj-yi)+xi)) inside=!inside;
+    }
+    return inside;
+  };
+
+  map.on(L.Draw.Event.CREATED, e => {
+    drawnItems.addLayer(e.layer); activeZone = e.layer; activeHandler = null;
+    // Apply current style
+    activeZone.setStyle(getZSO());
+    // Add label if set
+    const lbl = (document.getElementById('zoneLabelInp').value || '').trim();
+    if (lbl) {
+      const center = activeZone instanceof L.Circle
+        ? activeZone.getLatLng()
+        : activeZone.getBounds().getCenter();
+      L.tooltip({ permanent:true, direction:'center', className:'zone-tooltip' })
+        .setContent(lbl)
+        .setLatLng(center)
+        .addTo(drawnItems);
+    }
+    ['btnRect','btnPoly','btnCircle'].forEach(id => document.getElementById(id).classList.remove('zon'));
+    document.getElementById('btnClear').style.display = '';
+    document.getElementById('zoneInfo').style.display = '';
+    updateAll();
+  });
+}
+
+function mkIcon(g) {
+  const col = GC[g] || '#6b7280';
+  const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='32' viewBox='0 0 24 32'>"
+    + "<filter id='sh'><feDropShadow dx='0' dy='1.5' stdDeviation='1.5' flood-opacity='.5'/></filter>"
+    + "<g filter='url(#sh)'><path d='M12 1C6.48 1 2 5.48 2 11c0 8.5 10 20 10 20S22 19.5 22 11C22 5.48 17.52 1 12 1z' fill='" + col + "'/>"
+    + "<path d='M12 1C6.48 1 2 5.48 2 11c0 8.5 10 20 10 20S22 19.5 22 11C22 5.48 17.52 1 12 1z' fill='none' stroke='white' stroke-width='1.8'/>"
+    + "</g><circle cx='12' cy='11' r='4.5' fill='white' opacity='.95'/>"
+    + "<circle cx='12' cy='11' r='2.5' fill='" + col + "'/></svg>";
+  return L.divIcon({ html: svg, className: '', iconSize:[24,32], iconAnchor:[12,32], popupAnchor:[0,-34] });
+}
+
+function mkPopup(p) {
+  const col = GC[p.g] || '#6b7280';
+  const yn  = v => v==='ມີ' ? "<span style='color:#16a34a;font-weight:700'>&#x2705; ມີ</span>"
+                : v==='ບໍ່ມີ' ? "<span style='color:#dc2626;font-weight:700'>&#x274C; ບໍ່ມີ</span>"
+                : "<span style='color:#9ca3af'>—</span>";
+  const row = (lbl, val) => val ? "<div style='display:flex;gap:6px;align-items:baseline'><span style='color:#888;min-width:80px;font-size:11px'>" + lbl + "</span><span>" + val + "</span></div>" : '';
+  return "<div style='line-height:1.8;padding:2px 0'>"
+    + "<div style='font-weight:700;font-size:14px;color:#1a1d27;border-bottom:2px solid " + col + ";padding-bottom:4px;margin-bottom:7px'>" + (p.n||'ບໍ່ລະບຸຊື່') + "</div>"
+    + "<div style='display:flex;flex-direction:column;gap:3px'>"
+    + row('&#x1F3C5; ເກຣດ', "<b style='color:" + col + ";background:" + col + "22;padding:1px 8px;border-radius:10px'>" + p.g + "</b>")
+    + row('&#x1F4DE; ເບີໂທ',  p.ph ? "<a href='tel:" + p.ph + "' style='color:#4f46e5;text-decoration:none'>" + p.ph + "</a>" : '')
+    + row('&#x1F4B3; ເລກບັນຊີ', p.ac ? "<code style='background:#f3f4f6;padding:1px 6px;border-radius:4px;font-size:12px'>" + p.ac + "</code>" : '')
+    + row('&#x1F3EA; ທຸລະກິດ', p.b && p.b!=='ບໍ່ລະບຸ' ? p.b : '')
+    + row('&#x1F4CD; ບ້ານ',     p.v || '')
+    + row('&#x1F464; ພະນັກງານ', p.st || '')
+    + row('&#x1F4C5; ວັນທີ',   p.dt || '')
+    + row('&#x1F4F1; App LDB',  yn(p.ap))
+    + row('&#x1F4F2; QR TrustPay', yn(p.qr))
+    + "<div style='font-size:10px;color:#aaa;margin-top:5px;border-top:1px solid #eee;padding-top:4px'>&#x1F4CD; " + p.lat + ', ' + p.lng + "</div>"
+    + "<button class='popup-del' onclick='deletePin(" + ALL_PINS.indexOf(p) + ")'>&#x1F6AB; ຊ່ອນ/ລ໋ອກ pin ນີ້ (ບໍ່ສະແດງ)</button>"
+    + "</div></div>";
+}
+
+function updateMap(pins) {
+  if (!cluster) return;
+  cluster.clearLayers();
+  let zc = 0;
+  const isSearch = searchMatches !== null;
+  pins.forEach(p => {
+    const inZ = !activeZone || ptInZone(p.lat, p.lng, activeZone);
+    if (inZ) zc++;
+    const hl = isSearch && searchMatches && searchMatches.has(p);
+    const op = inZ ? (hl ? 1 : isSearch ? 0.3 : 1) : 0.1;
+    L.marker([p.lat, p.lng], { icon: mkIcon(p.g), opacity: op })
+      .bindPopup(mkPopup(p)).addTo(cluster);
+  });
+  const n = pins.length;
+  document.getElementById('kv4').textContent       = (activeZone ? zc : n).toLocaleString();
+  document.getElementById('pinBadge').textContent  = ALL_PINS.length.toLocaleString();
+  document.getElementById('mapCount').textContent  = n.toLocaleString() + ' pins';
+  if (activeZone) document.getElementById('zoneCnt').textContent = zc.toLocaleString();
+  const fp = activeZone ? pins.filter(p => ptInZone(p.lat, p.lng, activeZone)) : pins;
+  document.getElementById('qrY').textContent  = fp.filter(p => p.qr==='ມີ').length.toLocaleString();
+  document.getElementById('qrN').textContent  = fp.filter(p => p.qr==='ບໍ່ມີ').length.toLocaleString();
+  document.getElementById('appY').textContent = fp.filter(p => p.ap==='ມີ').length.toLocaleString();
+  document.getElementById('appN').textContent = fp.filter(p => p.ap==='ບໍ່ມີ').length.toLocaleString();
+}
+
+// ══════════════════════════════════════════════════════
+//  CHARTS
+// ══════════════════════════════════════════════════════
+const CC = ['#6366f1','#22d3ee','#34d399','#fb923c','#f472b6','#a78bfa','#fbbf24','#60a5fa'];
+Chart.defaults.color = '#7b82a8'; Chart.defaults.borderColor = 'rgba(255,255,255,.05)';
+Chart.defaults.font.family = "'Segoe UI',system-ui,sans-serif";
+const co = { responsive: true, maintainAspectRatio: false };
+let gradeChart, statusChart, monthlyChart, bizChart;
+
+function initCharts() {
+  if (gradeChart) return;
+  gradeChart   = new Chart(document.getElementById('gradeChart'),   { type:'doughnut', data:{labels:[],datasets:[{data:[],backgroundColor:[],borderWidth:2,borderColor:'#1a1d27',hoverOffset:6}]}, options:{...co,cutout:'62%',plugins:{legend:{position:'right',labels:{padding:9,font:{size:10},usePointStyle:true,pointStyleWidth:7}}}} });
+  statusChart  = new Chart(document.getElementById('statusChart'),  { type:'doughnut', data:{labels:[],datasets:[{data:[],backgroundColor:CC,borderWidth:2,borderColor:'#1a1d27',hoverOffset:6}]}, options:{...co,cutout:'60%',plugins:{legend:{position:'right',labels:{padding:8,font:{size:9},usePointStyle:true,pointStyleWidth:7}}}} });
+  monthlyChart = new Chart(document.getElementById('monthlyChart'), { type:'line',     data:{labels:[],datasets:[{label:'ລູກຄ້າ',data:[],borderColor:'#22d3ee',backgroundColor:'rgba(34,211,238,.08)',fill:true,tension:.4,pointBackgroundColor:'#22d3ee',pointRadius:4,pointHoverRadius:7,borderWidth:2.5}]}, options:{...co,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxRotation:45,font:{size:9}}},y:{grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true}}} });
+  bizChart     = new Chart(document.getElementById('bizChart'),     { type:'bar',      data:{labels:[],datasets:[{data:[],backgroundColor:CC,borderRadius:6,borderSkipped:false}]}, options:{...co,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true},y:{grid:{display:false},ticks:{font:{size:9}}}}} });
+}
+
+// ══════════════════════════════════════════════════════
+//  UPDATE ALL
+// ══════════════════════════════════════════════════════
+function updateAll() {
+  const pins = getFiltered(); const N = pins.length;
+  document.getElementById('fcnt').textContent = N.toLocaleString();
+  document.getElementById('kv1').textContent  = N.toLocaleString();
+  document.getElementById('kv1sub').textContent = 'ທັງໝົດ ' + ALL_PINS.length.toLocaleString() + ' records';
+  updateMap(pins);
+
+  const gc = {A:0,B:0,C:0,D:0,'N/A':0};
+  pins.forEach(p => { gc[p.g] = (gc[p.g]||0)+1; });
+  document.getElementById('kv2').textContent = gc.A.toLocaleString();
+  document.getElementById('kv3').textContent = gc.B.toLocaleString();
+
+  const gKeys = ['A','B','C','D','N/A'];
+  gradeChart.data.labels = gKeys;
+  gradeChart.data.datasets[0].data = gKeys.map(g => gc[g]||0);
+  gradeChart.data.datasets[0].backgroundColor = gKeys.map(g => GC[g]);
+  gradeChart.update();
+
+  const gT = N || 1;
+  document.getElementById('gradeStat').innerHTML =
+    [{k:'A',c:'#16a34a',l:'ເກຣດ A'},{k:'B',c:'#4f46e5',l:'ເກຣດ B'},
+     {k:'C',c:'#ea580c',l:'ເກຣດ C'},{k:'D',c:'#dc2626',l:'ເກຣດ D'},{k:'N/A',c:'#6b7280',l:'N/A'}]
+    .map(g => {
+      const v = gc[g.k]||0, p = ((v/gT)*100).toFixed(1);
+      return "<div class='srow'><div class='slbl'>"+g.l+"</div><div class='sbg'><div class='sfill' style='width:"+p+"%;background:"+g.c+"'></div></div><div class='sval' style='color:"+g.c+"'>"+v.toLocaleString()+"</div></div>";
+    }).join('');
+
+  const sc = {};
+  pins.forEach(p => { sc[p.s] = (sc[p.s]||0)+1; });
+  const sl = Object.keys(sc).sort((a,b) => sc[b]-sc[a]);
+  statusChart.data.labels = sl; statusChart.data.datasets[0].data = sl.map(s => sc[s]); statusChart.update();
+
+  const bc = {};
+  pins.forEach(p => { if (p.b && p.b!=='ບໍ່ລະບຸ' && p.b!=='nan') bc[p.b] = (bc[p.b]||0)+1; });
+  const be = Object.entries(bc).sort((a,b) => b[1]-a[1]).slice(0,8);
+  bizChart.data.labels = be.map(e=>e[0]); bizChart.data.datasets[0].data = be.map(e=>e[1]); bizChart.update();
+
+  const md = {};
+  pins.forEach(p => { if (p.dt) md[p.dt] = (md[p.dt]||0)+1; });
+  const mk = Object.keys(md).sort();
+  monthlyChart.data.labels = mk; monthlyChart.data.datasets[0].data = mk.map(k=>md[k]); monthlyChart.update();
+
+  const vc = {};
+  pins.forEach(p => { if (p.v && p.v!=='nan') vc[p.v] = (vc[p.v]||0)+1; });
+  const ve = Object.entries(vc).sort((a,b) => b[1]-a[1]).slice(0,10);
+  document.getElementById('vilTbl').innerHTML = ve.map(([nm,cnt],i) => {
+    const cls = i===0?'r1c':i===1?'r2c':i===2?'r3c':'';
+    return "<tr><td><span class='rb "+cls+"'>"+(i+1)+"</span></td><td>"+nm+"</td><td style='font-weight:600;color:var(--c2)'>"+cnt.toLocaleString()+"</td></tr>";
+  }).join('');
+
+  const sf = {};
+  pins.forEach(p => { if (p.st) sf[p.st] = (sf[p.st]||0)+1; });
+  const sfe = Object.entries(sf).sort((a,b) => b[1]-a[1]).slice(0,15);
+  const sfMax = sfe.length ? sfe[0][1] : 1;
+  document.getElementById('staffBoard').innerHTML = sfe.map(([nm,cnt]) =>
+    "<div class='staff-row'><div class='staff-name' title='"+nm+"'>"+nm+"</div>"
+    +"<div class='staff-bg'><div class='staff-fill' style='width:"+Math.round(cnt/sfMax*100)+"%'></div></div>"
+    +"<div class='staff-cnt'>"+cnt+"</div></div>"
+  ).join('');
+
+  updateTracker(pins);
+}
+
+// ══════════════════════════════════════════════════════
+//  TARGET TRACKER
+// ══════════════════════════════════════════════════════
+const TD = [
+  {id:'t_total',label:'ລູກຄ້າທັງໝົດ', col:'#22d3ee',def:3000, fn:pins=>pins.length},
+  {id:'t_ab',   label:'ເກຣດ A + B',    col:'#34d399',def:800,  fn:pins=>pins.filter(p=>p.g==='A'||p.g==='B').length},
+  {id:'t_qr',   label:'QR ມີ',          col:'#f472b6',def:600,  fn:pins=>pins.filter(p=>p.qr==='ມີ').length},
+  {id:'t_app',  label:'App LDB ມີ',     col:'#a78bfa',def:1000, fn:pins=>pins.filter(p=>p.ap==='ມີ').length},
+  {id:'t_done', label:'ລະດົມສຳເລັດ',   col:'#fb923c',def:200,  fn:pins=>pins.filter(p=>p.s==='ລະດົມສຳເລັດ').length},
+];
+function getT(id) { const v=parseInt(localStorage.getItem(id)); return isNaN(v)?TD.find(d=>d.id===id).def:v; }
+function setT(id,val) { const n=parseInt(val); if(!isNaN(n)&&n>0)localStorage.setItem(id,n); updateAll(); }
+function updateTracker(pins) {
+  const wrap = document.getElementById('trackerWrap'); if(!wrap) return;
+  wrap.innerHTML = TD.map(d => {
+    const actual=d.fn(pins||[]),target=getT(d.id);
+    const pct=Math.min(Math.round(actual/target*100),100),over=actual>=target;
+    const pctTxt=over?'&#x2705; '+Math.round(actual/target*100)+'%':pct+'%';
+    return "<div class='trow'>"
+      +"<div class='trow-top'><span class='tlbl'>"+d.label+"</span><span class='tpct"+(over?' tover':'')+"' style='color:"+d.col+"'>"+pctTxt+"</span></div>"
+      +"<div class='tbar-bg'><div class='tbar-fill' style='width:"+pct+"%;background:"+d.col+"'></div></div>"
+      +"<div class='trow-bot'><span class='tact'>"+actual.toLocaleString()+" / "+target.toLocaleString()+"</span>"
+        +"<div class='tinp-wrap'><span>Target:</span><input class='tinp' type='number' value='"+target+"' min='1'"
+          +" onchange=\"setT('"+d.id+"',this.value)\" oninput=\"setT('"+d.id+"',this.value)\"></div>"
+      +"</div></div>";
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+//  EXPORT CSV
+// ══════════════════════════════════════════════════════
+function exportCSV() {
+  const pins = getFiltered();
+  if (!pins.length) { alert('ບໍ່ມີຂໍ້ມູນ'); return; }
+  const HDR = ['ຊື່ເຈົ້າຂອງ','ເບີໂທ','ເລກບັນຊີ','ເກຣດ','ທຸລະກິດ','ບ້ານ','ສະຖານະ','App LDB','QR','ພະນັກງານ','ວັນທີ','Lat','Lng'];
+  const esc = v => '"' + (v||'').toString().replace(/"/g,'""') + '"';
+  const csv = '﻿' + [HDR.map(esc).join(','), ...pins.map(p =>
+    [p.n,p.ph,p.ac,p.g,p.b,p.v,p.s,p.ap,p.qr,p.st,p.dt,p.lat,p.lng].map(esc).join(',')
+  )].join('\r\n');
+  const a = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = 'laksao_live_' + new Date().toISOString().slice(0,10) + '_' + pins.length + 'pins.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ══════════════════════════════════════════════════════
+//  UI HELPERS
+// ══════════════════════════════════════════════════════
+function setLoading(show, txt) {
+  document.getElementById('loadingBox').style.display = show ? '' : 'none';
+  if (txt) document.getElementById('loadingTxt').textContent = txt;
+}
+function showErr(msg) {
+  const b = document.getElementById('errBox');
+  b.innerHTML = msg; b.style.display = '';
+}
+function hideErr() { document.getElementById('errBox').style.display = 'none'; }
+
+// ── Hidden Pins — persisted in localStorage ──────────
+const LS_HIDDEN = 'laksao_hidden_pins';
+
+function pinKey(p) {
+  // Unique key: account number (most reliable) or lat+lng
+  return p.ac ? ('ac_' + p.ac) : ('ll_' + p.lat.toFixed(4) + '_' + p.lng.toFixed(4));
+}
+function loadHidden() {
+  try { return new Set(JSON.parse(localStorage.getItem(LS_HIDDEN) || '[]')); }
+  catch(e) { return new Set(); }
+}
+function saveHidden(s) {
+  localStorage.setItem(LS_HIDDEN, JSON.stringify(Array.from(s)));
+}
+
+let HIDDEN_PINS = loadHidden();
+
+function deletePin(idx) {
+  const p = ALL_PINS[idx];
+  if (!p) return;
+  HIDDEN_PINS.add(pinKey(p));
+  saveHidden(HIDDEN_PINS);
+  map.closePopup();
+  updateDelBadge();
+  updateAll();
+}
+
+function restoreDeleted() {
+  if (!confirm('ຕ້ອງການຄືນ pins ທີ່ຊ່ອນໄວ້ທັງໝົດ (' + HIDDEN_PINS.size + ' pins) ບໍ?')) return;
+  HIDDEN_PINS.clear();
+  saveHidden(HIDDEN_PINS);
+  updateDelBadge();
+  updateAll();
+}
+
+function updateDelBadge() {
+  const n = HIDDEN_PINS.size;
+  const badge = document.getElementById('delBadge');
+  badge.style.display = n > 0 ? '' : 'none';
+  document.getElementById('delCnt').textContent = n;
+}
+
+// Override getFiltered to exclude hidden pins
+const _gfOrig = getFiltered;
+getFiltered = function() {
+  if (HIDDEN_PINS.size === 0) return _gfOrig();
+  return _gfOrig().filter(p => !HIDDEN_PINS.has(pinKey(p)));
+};
+
+// Init badge on load
+setTimeout(updateDelBadge, 500);
+
+// ── Fullscreen ────────────────────────────────────────
+let isFullscreen = false;
+function toggleFullscreen() {
+  const card = document.getElementById('mapbox').closest('.card');
+  const btn  = document.getElementById('btnFs');
+  if (!isFullscreen) {
+    card.classList.add('map-card-full');
+    btn.textContent = '⊠ ອອກ';
+    btn.classList.add('active');
+    isFullscreen = true;
+    document.addEventListener('keydown', escFullscreen);
+  } else {
+    card.classList.remove('map-card-full');
+    btn.textContent = '⛶ ເຕັມຈໍ';
+    btn.classList.remove('active');
+    isFullscreen = false;
+    document.removeEventListener('keydown', escFullscreen);
+  }
+  setTimeout(() => map.invalidateSize(), 150);
+}
+
+function escFullscreen(e) {
+  if (e.key === 'Escape' && isFullscreen) toggleFullscreen();
+}
+
+
+// ── Zone Style State ─────────────────────────────────
+let zoneColor   = '#6366f1';
+let zoneOpacity = 0.15;
+
+function getZSO() {
+  return {
+    color:       zoneColor,
+    weight:      2.5,
+    fillColor:   zoneColor,
+    fillOpacity: zoneOpacity
+  };
+}
+
+function setZoneColor(col, el, isCustom) {
+  zoneColor = col;
+  // Update swatch active state
+  document.querySelectorAll('.csw').forEach(s => s.classList.remove('active'));
+  if (el) el.classList.add('active');
+  // Update custom preview
+  if (isCustom) {
+    document.getElementById('customColorPreview').style.background = col;
+  }
+  // Live-update existing zone layer style
+  if (activeZone) {
+    activeZone.setStyle({ color: col, fillColor: col, fillOpacity: zoneOpacity });
+  }
+}
+
+function updateZoneOpacity(val) {
+  zoneOpacity = parseFloat(val) / 100;
+  const pct = Math.round(val / 60 * 100);
+  document.getElementById('zoneOpacity').style.setProperty('--val', pct + '%');
+  document.getElementById('opacityVal').textContent = val + '%';
+  if (activeZone) {
+    activeZone.setStyle({ fillOpacity: zoneOpacity });
+  }
+}
+
+</script>
+</body>
+</html>
