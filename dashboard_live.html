@@ -297,6 +297,15 @@ td{padding:5px 7px;border-bottom:1px solid var(--bd)}tr:last-child td{border-bot
 .fbar-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; width:100%; }
 .fbar-row + .fbar-row { padding-top:8px; border-top:1px solid var(--bd); }
 
+
+/* Staff leaderboard with ID */
+.staff-id   { font-size:.62rem; color:var(--c2); background:rgba(34,211,238,.12);
+              padding:1px 6px; border-radius:10px; flex-shrink:0; white-space:nowrap; min-width:36px; text-align:center; }
+.staff-rank { font-size:.62rem; font-weight:700; min-width:16px; text-align:center; color:var(--mu); }
+.staff-rank.r1 { color:#fbbf24; }
+.staff-rank.r2 { color:#9ca3af; }
+.staff-rank.r3 { color:#b4643c; }
+
 </style>
 </head>
 <body>
@@ -668,6 +677,11 @@ function normStaff(v) {
   if (!v) return '';
   return String(v).replace(/LDເກຣດ\s*B/g,'LDB').replace(/^(ທ່ານ|ທ\.|ທ\s|ນ\.|ນ\s)/,'').trim().slice(0,25);
 }
+function normStaffId(v) {
+  if (!v) return '';
+  // Strip artifacts like 'LDB' prefix, keep digits/short code
+  return String(v).replace(/LDເກຣດ\s*B/g,'').replace(/LDB/gi,'').trim().slice(0,15);
+}
 function jitter(v, amt) { amt = amt || 0.0004; return v + (Math.random() - 0.5) * amt; }
 
 function processRaw(rows) {
@@ -707,6 +721,7 @@ function processRaw(rows) {
     const appLDB  = fv(r, ['LDເກຣດBTRUST','LDBTrust','LDB TRUST','LDBTrust','app','LDBTrust','ldbtrust']);
     const qr      = fv(r, ['QRTRUSTPAY','QRTrustPay','QR TRUSTPAY','qr','trustpay']);
     const staff   = fv(r, ['ພະນັກງານຜູ້ລະດົມ','ພະນກງານຜູລະດມ','staff','ພະນັກງານ']);
+    const staffId = fv(r, ['ລະຫັດພະນັກງານ','ລະຫດພະນກງານ','staff_id','staffid','ລະຫັດ']);
     const date    = fv(r, ['ວັນທີເດືອນປີ','ວນທເດອນປ','date','ວັນທີ']);
 
     pins.push({
@@ -722,6 +737,7 @@ function processRaw(rows) {
       ap:  normYN(appLDB),
       qr:  normYN(qr),
       st:  normStaff(staff),
+      sid: normStaffId(staffId),
       dt:  normDate(date),
     });
   });
@@ -989,6 +1005,7 @@ function mkPopup(p) {
     + row('&#x1F4B3; ເລກບັນຊີ', p.ac ? "<code style='background:#f3f4f6;padding:1px 6px;border-radius:4px;font-size:12px'>" + p.ac + "</code>" : '')
     + row('&#x1F3EA; ທຸລະກິດ', p.b && p.b!=='ບໍ່ລະບຸ' ? p.b : '')
     + row('&#x1F4CD; ບ້ານ',     p.v || '')
+    + row('&#x1F3AB; ລະຫັດ', p.sid || '')
     + row('&#x1F464; ພະນັກງານ', p.st || '')
     + row('&#x1F4C5; ວັນທີ',   p.dt || '')
     + row('&#x1F4F1; App LDB',  yn(p.ap))
@@ -1093,15 +1110,27 @@ function updateAll() {
     return "<tr><td><span class='rb "+cls+"'>"+(i+1)+"</span></td><td>"+nm+"</td><td style='font-weight:600;color:var(--c2)'>"+cnt.toLocaleString()+"</td></tr>";
   }).join('');
 
-  const sf = {};
-  pins.forEach(p => { if (p.st) sf[p.st] = (sf[p.st]||0)+1; });
-  const sfe = Object.entries(sf).sort((a,b) => b[1]-a[1]).slice(0,15);
-  const sfMax = sfe.length ? sfe[0][1] : 1;
-  document.getElementById('staffBoard').innerHTML = sfe.map(([nm,cnt]) =>
-    "<div class='staff-row'><div class='staff-name' title='"+nm+"'>"+nm+"</div>"
-    +"<div class='staff-bg'><div class='staff-fill' style='width:"+Math.round(cnt/sfMax*100)+"%'></div></div>"
-    +"<div class='staff-cnt'>"+cnt+"</div></div>"
-  ).join('');
+  // Group by composite key: sid|name
+  const sfMap = {};
+  pins.forEach(p => {
+    if (!p.st && !p.sid) return;
+    const key = (p.sid || '') + '|' + (p.st || '');
+    if (!sfMap[key]) sfMap[key] = { name: p.st||'', sid: p.sid||'', cnt: 0 };
+    sfMap[key].cnt++;
+  });
+  const sfe = Object.values(sfMap).sort((a,b) => b.cnt-a.cnt).slice(0,15);
+  const sfMax = sfe.length ? sfe[0].cnt : 1;
+  document.getElementById('staffBoard').innerHTML = sfe.map((s,i) => {
+    const pct = Math.round(s.cnt/sfMax*100);
+    const rCls = i===0?'r1':i===1?'r2':i===2?'r3':'';
+    return "<div class='staff-row'>"
+      +"<span class='staff-rank "+rCls+"'>"+(i+1)+"</span>"
+      +(s.sid ? "<span class='staff-id'>"+s.sid+"</span>" : "")
+      +"<div class='staff-name' title='"+s.name+"'>"+s.name+"</div>"
+      +"<div class='staff-bg'><div class='staff-fill' style='width:"+pct+"%'></div></div>"
+      +"<div class='staff-cnt'>"+s.cnt+"</div>"
+      +"</div>";
+  }).join('');
 
   updateTracker(pins);
 }
@@ -1140,10 +1169,10 @@ function updateTracker(pins) {
 function exportCSV() {
   const pins = getFiltered();
   if (!pins.length) { alert('ບໍ່ມີຂໍ້ມູນ'); return; }
-  const HDR = ['ຊື່ເຈົ້າຂອງ','ເບີໂທ','ເລກບັນຊີ','ເກຣດ','ທຸລະກິດ','ບ້ານ','ສະຖານະ','App LDB','QR','ພະນັກງານ','ວັນທີ','LAT&LONG'];
+  const HDR = ['ຊື່ເຈົ້າຂອງ','ເບີໂທ','ເລກບັນຊີ','ເກຣດ','ທຸລະກິດ','ບ້ານ','ສະຖານະ','App LDB','QR','ລະຫັດພະນັກງານ','ຊື່ພະນັກງານ','ວັນທີ','LAT&LONG'];
   const esc = v => '"' + (v||'').toString().replace(/"/g,'""') + '"';
   const csv = '﻿' + [HDR.map(esc).join(','), ...pins.map(p =>
-    [p.n,p.ph,p.ac,p.g,p.b,p.v,p.s,p.ap,p.qr,p.st,p.dt,(p.lat&&p.lng?p.lat+', '+p.lng:'')].map(esc).join(',')
+    [p.n,p.ph,p.ac,p.g,p.b,p.v,p.s,p.ap,p.qr,p.sid||"",p.st,p.dt,(p.lat&&p.lng?p.lat+', '+p.lng:"")].map(esc).join(',')
   )].join('\r\n');
   const a = document.createElement('a');
   a.href     = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
