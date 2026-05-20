@@ -438,11 +438,9 @@ td{padding:5px 7px;border-bottom:1px solid var(--bd)}tr:last-child td{border-bot
     <div class="fsep"></div>
     <div class="fgrp">
       <span class="flbl">&#x1F3EA; ທຸລະກິດ</span>
-      <span class="chip on"  data-f="biz" data-v="all">ທັງໝົດ</span>
-      <span class="chip"     data-f="biz" data-v="ການຄ້າ">ການຄ້າ</span>
-      <span class="chip"     data-f="biz" data-v="ບໍລິການ">ບໍລິການ</span>
-      <span class="chip"     data-f="biz" data-v="ອາຫານ">ອາຫານ</span>
-      <span class="chip"     data-f="biz" data-v="ປະຊາຊົນທົ່ວໄປ">ທົ່ວໄປ</span>
+      <select class="vsel" id="bizFilter" onchange="onBizFilter()">
+        <option value="">ທັງໝົດ</option>
+      </select>
     </div>
     <div class="fsep"></div>
     <div class="fgrp">
@@ -609,6 +607,7 @@ async function fetchData(url) {
     setDateRange();
     updateAll();
     populateVillageDropdown();
+    populateBizDropdown();
 
   } catch(e) {
     setLoading(false);
@@ -778,7 +777,7 @@ const FS = {
   hasAcct: new Set(['yes','no']),
   hasApp:  new Set(['yes','no','na']),
   hasQR:   new Set(['yes','no','na']),
-  biz:     new Set(['all']),
+  // biz: handled by #bizFilter dropdown
 };
 
 function pinAcctKey(p)  { return p.ac && p.ac.trim() ? 'yes' : 'no'; }
@@ -789,14 +788,14 @@ function getFiltered() {
   const selVil = (document.getElementById('villageFilter') || {}).value || '';
   const dFrom = document.getElementById('dFrom') ? document.getElementById('dFrom').value : '';
   const dTo   = document.getElementById('dTo')   ? document.getElementById('dTo').value   : '';
-  const bizAll = FS.biz.has('all');
   let pins = ALL_PINS.filter(p => {
     if (!FS.grade.has(p.g))          return false;
     if (!FS.status.has(p.s))         return false;
     if (!FS.hasAcct.has(pinAcctKey(p))) return false;
     if (!FS.hasApp.has(pinAppKey(p)))   return false;
     if (!FS.hasQR.has(pinQRKey(p)))     return false;
-    if (!bizAll && !FS.biz.has(p.b))    return false;
+    const selBiz = (document.getElementById('bizFilter')||{}).value||'';
+    if (selBiz && p.b !== selBiz) return false;
     if (selVil && p.v !== selVil)            return false;
     if (p.dt && dFrom && dTo && (p.dt < dFrom || p.dt > dTo)) return false;
     return true;
@@ -808,16 +807,8 @@ function getFiltered() {
 document.querySelectorAll('.chip[data-f]').forEach(c => {
   c.addEventListener('click', () => {
     const f = c.dataset.f, v = c.dataset.v;
-    if (f === 'biz') {
-      // biz: single-select — 'all' = reset, others = exclusive pick
-      document.querySelectorAll('.chip[data-f="biz"]').forEach(x => x.classList.remove('on'));
-      if (v === 'all' || FS.biz.has(v)) {
-        FS.biz = new Set(['all']);
-        document.querySelector('.chip[data-f="biz"][data-v="all"]').classList.add('on');
-      } else {
-        FS.biz = new Set([v]);
-        c.classList.add('on');
-      }
+    if (false) {
+      // biz handled by dropdown
     } else {
       if (FS[f] === undefined) return;
       if (FS[f].has(v)) { if (FS[f].size === 1) return; FS[f].delete(v); c.classList.remove('on'); }
@@ -833,18 +824,13 @@ function resetAll() {
   FS.hasAcct = new Set(['yes','no']);
   FS.hasApp  = new Set(['yes','no','na']);
   FS.hasQR   = new Set(['yes','no','na']);
-  FS.biz     = new Set(['all']);
-  document.querySelectorAll('.chip[data-f]').forEach(c => {
-    if (c.dataset.f === 'biz') {
-      c.classList.toggle('on', c.dataset.v === 'all');
-    } else {
-      c.classList.add('on');
-    }
-  });
+  document.querySelectorAll('.chip[data-f]').forEach(c => c.classList.add('on'));
   setDateRange();
   clearSearch();
   const vsel = document.getElementById('villageFilter');
   if (vsel) vsel.value = '';
+  const bsel = document.getElementById('bizFilter');
+  if (bsel) bsel.value = '';
   updateAll();
 }
 
@@ -1270,6 +1256,28 @@ getFiltered = function() {
 
 // Init badge on load
 setTimeout(updateDelBadge, 500);
+
+// ── Populate business type dropdown ─────────────────
+function populateBizDropdown() {
+  const sel = document.getElementById('bizFilter');
+  if (!sel) return;
+  const bc = {};
+  ALL_PINS.forEach(p => {
+    if (p.b && p.b !== 'ບໍ່ລະບຸ' && p.b !== 'nan') bc[p.b] = (bc[p.b]||0)+1;
+  });
+  const sorted = Object.entries(bc).sort((a,b) => b[1]-a[1]);
+  const current = sel.value;
+  sel.innerHTML = '<option value="">&#x1F3EA; ທັງໝົດ (' + ALL_PINS.length.toLocaleString() + ')</option>';
+  sorted.forEach(([biz, cnt]) => {
+    const opt = document.createElement('option');
+    opt.value = biz;
+    opt.textContent = biz + '  (' + cnt + ')';
+    if (biz === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function onBizFilter() { updateAll(); }
 
 // ── Populate village dropdown ──────────────────────
 function populateVillageDropdown() {
