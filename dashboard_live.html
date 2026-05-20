@@ -306,6 +306,20 @@ td{padding:5px 7px;border-bottom:1px solid var(--bd)}tr:last-child td{border-bot
 .staff-rank.r2 { color:#9ca3af; }
 .staff-rank.r3 { color:#b4643c; }
 
+
+/* Village filter dropdown */
+.vsel {
+  background:var(--sur2); border:1px solid var(--bd); border-radius:8px;
+  padding:4px 10px; color:var(--txt); font-size:.72rem; outline:none;
+  cursor:pointer; transition:border-color .15s; max-width:180px;
+  appearance:none; -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237b82a8'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 8px center;
+  padding-right:26px;
+}
+.vsel:focus { border-color:var(--c2); }
+.vsel option { background:var(--sur2); color:var(--txt); }
+
 </style>
 </head>
 <body>
@@ -429,6 +443,13 @@ td{padding:5px 7px;border-bottom:1px solid var(--bd)}tr:last-child td{border-bot
       <span class="chip"     data-f="biz" data-v="ບໍລິການ">ບໍລິການ</span>
       <span class="chip"     data-f="biz" data-v="ອາຫານ">ອາຫານ</span>
       <span class="chip"     data-f="biz" data-v="ປະຊາຊົນທົ່ວໄປ">ທົ່ວໄປ</span>
+    </div>
+    <div class="fsep"></div>
+    <div class="fgrp">
+      <span class="flbl">&#x1F3D8; ບ້ານ</span>
+      <select class="vsel" id="villageFilter" onchange="updateAll()">
+        <option value="">ທັງໝົດ</option>
+      </select>
     </div>
     <div class="fsep"></div>
     <span class="fcnt" style="margin-left:auto;white-space:nowrap">ສະແດງ: <span id="fcnt">-</span></span>
@@ -587,6 +608,7 @@ async function fetchData(url) {
     initMap();
     setDateRange();
     updateAll();
+    populateVillageDropdown();
 
   } catch(e) {
     setLoading(false);
@@ -764,6 +786,7 @@ function pinAppKey(p)   { return p.ap==='ມີ' ? 'yes' : p.ap==='ບໍ່ມ�
 function pinQRKey(p)    { return p.qr==='ມີ' ? 'yes' : p.qr==='ບໍ່ມີ' ? 'no' : 'na'; }
 
 function getFiltered() {
+  const selVil = (document.getElementById('villageFilter') || {}).value || '';
   const dFrom = document.getElementById('dFrom') ? document.getElementById('dFrom').value : '';
   const dTo   = document.getElementById('dTo')   ? document.getElementById('dTo').value   : '';
   const bizAll = FS.biz.has('all');
@@ -774,6 +797,7 @@ function getFiltered() {
     if (!FS.hasApp.has(pinAppKey(p)))   return false;
     if (!FS.hasQR.has(pinQRKey(p)))     return false;
     if (!bizAll && !FS.biz.has(p.b))    return false;
+    if (selVil && p.v !== selVil)            return false;
     if (p.dt && dFrom && dTo && (p.dt < dFrom || p.dt > dTo)) return false;
     return true;
   });
@@ -819,6 +843,8 @@ function resetAll() {
   });
   setDateRange();
   clearSearch();
+  const vsel = document.getElementById('villageFilter');
+  if (vsel) vsel.value = '';
   updateAll();
 }
 
@@ -1244,6 +1270,27 @@ getFiltered = function() {
 
 // Init badge on load
 setTimeout(updateDelBadge, 500);
+
+// ── Populate village dropdown ──────────────────────
+function populateVillageDropdown() {
+  const sel = document.getElementById('villageFilter');
+  if (!sel) return;
+  // Collect unique villages sorted by count
+  const vc = {};
+  ALL_PINS.forEach(p => { if (p.v && p.v !== 'nan') vc[p.v] = (vc[p.v]||0)+1; });
+  const sorted = Object.entries(vc).sort((a,b) => b[1]-a[1]);
+  // Keep current value
+  const current = sel.value;
+  // Rebuild options
+  sel.innerHTML = '<option value="">&#x1F3D8; ທັງໝົດ (' + ALL_PINS.length.toLocaleString() + ')</option>';
+  sorted.forEach(([vil, cnt]) => {
+    const opt = document.createElement('option');
+    opt.value = vil;
+    opt.textContent = vil + '  (' + cnt + ')';
+    if (vil === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
 
 // ── Fullscreen ────────────────────────────────────────
 let isFullscreen = false;
