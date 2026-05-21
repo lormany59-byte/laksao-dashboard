@@ -734,18 +734,18 @@ function processRaw(rows) {
     // ── Fields with fuzzy column matching ────────────
     const grade   = fv(r, ['ເກຣດ','grade','Grade']);
     const biz     = fv(r, ['ປະເພດທຸລະກິດ','ປະເພດທຸລະກິດ','biz']);
-    // Owner name: try all variants, skip if pure numeric
-    const _ownerRaw = fv(r, [
+    // Owner name — Column B in Google Sheets
+    // Try _nameColB (Apps Script sends col index 1) first, then fallbacks
+    const _colB     = fv(r, ['_nameColB']);   // injected by Apps Script using row[1]
+    const _ownerRaw = _colB || fv(r, [
       'ຊື່ເຈົ້າຂອງເຮືອນ/ເຈົ້າຂອງທຸລະກິດ',
       'ຊື່ເຈາຂອງເຮືອນ/ເຈາຂອງທຸລະກິດ',
-      'ຊື່ເຈົ້າຂອງ',
-      'owner_name', 'owner', 'OwnerName',
-      'ຊື່ລູກຄ້າ',
+      'ຊື່ເຈົ້າຂອງ', 'owner_name', 'owner',
     ]);
-    // Fallback to account name if owner is empty/numeric
-    const _acctName = fv(r, ['ຊື່ບັນຊີ','account_name','AccountName']);
-    const owner = (!_ownerRaw || /^[\d,\.]+$/.test(_ownerRaw.trim()))
-      ? _acctName   // use account name if owner is blank or a number
+    // Fallback to account name if still empty or pure numeric
+    const _acctName = fv(r, ['ຊື່ບັນຊີ','account_name']);
+    const owner = (!_ownerRaw || /^[\d,\.\s]+$/.test(_ownerRaw.trim()))
+      ? _acctName
       : _ownerRaw;
     const village = fv(r, ['ບ້ານ','village','ບານ']);
     const status  = fv(r, ['ໃໝ່/ເກົ່າ','ໃໝ/ເກົາ','ໃໝ່/ເກົ່າ','status']);
