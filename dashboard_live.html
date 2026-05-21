@@ -734,7 +734,19 @@ function processRaw(rows) {
     // ── Fields with fuzzy column matching ────────────
     const grade   = fv(r, ['ເກຣດ','grade','Grade']);
     const biz     = fv(r, ['ປະເພດທຸລະກິດ','ປະເພດທຸລະກິດ','biz']);
-    const owner   = fv(r, ['ຊື່ເຈົ້າຂອງເຮືອນ/ເຈົ້າຂອງທຸລະກິດ','ຊືເຈາຂອງເຮືອນ/ເຈາຂອງທຸລະກິດ','owner','ຊື່ເຈົ້າຂອງ']);
+    // Owner name: try all variants, skip if pure numeric
+    const _ownerRaw = fv(r, [
+      'ຊື່ເຈົ້າຂອງເຮືອນ/ເຈົ້າຂອງທຸລະກິດ',
+      'ຊື່ເຈາຂອງເຮືອນ/ເຈາຂອງທຸລະກິດ',
+      'ຊື່ເຈົ້າຂອງ',
+      'owner_name', 'owner', 'OwnerName',
+      'ຊື່ລູກຄ້າ',
+    ]);
+    // Fallback to account name if owner is empty/numeric
+    const _acctName = fv(r, ['ຊື່ບັນຊີ','account_name','AccountName']);
+    const owner = (!_ownerRaw || /^[\d,\.]+$/.test(_ownerRaw.trim()))
+      ? _acctName   // use account name if owner is blank or a number
+      : _ownerRaw;
     const village = fv(r, ['ບ້ານ','village','ບານ']);
     const status  = fv(r, ['ໃໝ່/ເກົ່າ','ໃໝ/ເກົາ','ໃໝ່/ເກົ່າ','status']);
     const phone   = fv(r, ['ເບິໂທ','ເບີໂທ','ເບິໂທ','phone','tel','ເບີ']);
@@ -1010,7 +1022,7 @@ function mkPopup(p) {
                 : "<span style='color:#9ca3af'>—</span>";
   const row = (lbl, val) => val ? "<div style='display:flex;gap:6px;align-items:baseline'><span style='color:#888;min-width:80px;font-size:11px'>" + lbl + "</span><span>" + val + "</span></div>" : '';
   return "<div style='line-height:1.8;padding:2px 0'>"
-    + "<div style='font-weight:700;font-size:14px;color:#1a1d27;border-bottom:2px solid " + col + ";padding-bottom:4px;margin-bottom:7px'>" + (p.n||'ບໍ່ລະບຸຊື່') + "</div>"
+    + "<div style='font-weight:700;font-size:14px;color:#1a1d27;border-bottom:2px solid " + col + ";padding-bottom:4px;margin-bottom:7px'>" + (p.n && p.n.trim() ? p.n : '<span style="color:#aaa;font-style:italic">ບໍ່ລະບຸຊື່</span>') + "</div>"
     + "<div style='display:flex;flex-direction:column;gap:3px'>"
     + row('&#x1F3C5; ເກຣດ', "<b style='color:" + col + ";background:" + col + "22;padding:1px 8px;border-radius:10px'>" + p.g + "</b>")
     + row('&#x1F4DE; ເບີໂທ',  p.ph ? "<a href='tel:" + p.ph + "' style='color:#4f46e5;text-decoration:none'>" + p.ph + "</a>" : '')
