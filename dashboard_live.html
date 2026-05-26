@@ -675,23 +675,37 @@ function parseLL(v) {
   return null;
 }
 function normDate(v) {
-  if (!v) return '';
+  if (!v && v !== 0) return '';
   try {
-    let d;
+    let yr, mo, dy;
     if (typeof v === 'number') {
-      // Excel serial date
-      d = new Date((v - 25569) * 86400000);
+      // Excel serial date — use UTC to avoid timezone shift
+      const d = new Date((v - 25569) * 86400000);
+      if (isNaN(d.getTime())) return '';
+      yr = d.getUTCFullYear(); mo = d.getUTCMonth()+1; dy = d.getUTCDate();
     } else {
-      // Try parse string date (e.g. "3/15/2025 10:58:47")
-      d = new Date(v);
+      const s = String(v).trim().replace(/[​‌‍﻿]/g,'');
+      if (!s) return '';
+      let m;
+      // 1) YYYY-MM-DD or YYYY/MM/DD  (Apps Script Date objects → ISO JSON string)
+      m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+      if (m) { yr=+m[1]; mo=+m[2]; dy=+m[3]; }
+      else {
+        // 2) D/M/YYYY or D-M-YYYY or D.M.YYYY  (Lao/Thai text date format)
+        m = s.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})/);
+        if (m) { dy=+m[1]; mo=+m[2]; yr=+m[3]; }
+        else {
+          // 3) Fallback: JS Date parse (handles M/D/YYYY, ISO with time, etc.)
+          const d = new Date(s);
+          if (!isNaN(d.getTime())) {
+            yr=d.getFullYear(); mo=d.getMonth()+1; dy=d.getDate();
+          } else return '';
+        }
+      }
     }
-    if (isNaN(d.getTime())) return '';
-    let yr = d.getFullYear();
-    if (yr > 2100) yr -= 543;  // Buddhist calendar
-    if (yr < 2020 || yr > 2030) return '';
-    const mm = String(d.getMonth()+1).padStart(2,'0');
-    const dd = String(d.getDate()).padStart(2,'0');
-    return yr + '-' + mm + '-' + dd;  // YYYY-MM-DD
+    if (yr > 2100) yr -= 543;          // Buddhist calendar → Gregorian
+    if (yr < 2020 || yr > 2035) return '';
+    return String(yr)+'-'+String(mo).padStart(2,'0')+'-'+String(dy).padStart(2,'0');
   } catch(e) { return ''; }
 }
 function normStaff(v) {
@@ -809,7 +823,12 @@ function getFiltered() {
     const selBiz = (document.getElementById('bizFilter')||{}).value||'';
     if (selBiz && p.b !== selBiz) return false;
     if (selVil && p.v !== selVil)            return false;
-    if (p.dt && dFrom && dTo && (p.dt < dFrom || p.dt > dTo)) return false;
+    // Date filter — when active, exclude pins with no date too
+    if (dFrom || dTo) {
+      if (!p.dt) return false;
+      if (dFrom && p.dt < dFrom) return false;
+      if (dTo   && p.dt > dTo)   return false;
+    }
     return true;
   });
   if (searchMatches) pins = pins.filter(p => searchMatches.has(p));
