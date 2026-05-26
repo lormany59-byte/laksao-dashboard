@@ -734,11 +734,20 @@ function processRaw(rows) {
     return true;
   });
   console.log('After dedup:', rows.length, 'rows');
-  // ── DATE DEBUG (one-liner summary) ─────────────────
+  // ── DATE DEBUG ─────────────────────────────────────
   try {
     const _r0 = rows[0] || {};
-    console.log('[LAKSAO] Col keys:', Object.keys(_r0).slice(0,20).join(' | '));
-  } catch(_e) {}
+    console.log('COLUMN KEYS:', Object.keys(_r0).join(' | ').slice(0,300));
+    const _dk = ['ວັນທີເດືອນປີ','ວນທເດອນປ','ວັນທີ','date'];
+    for (let _k of _dk) {
+      if (_r0[_k] !== undefined) {
+        console.log('DATE COL:', _k, '| RAW:', _r0[_k], '| TYPE:', typeof _r0[_k], '| NORM:', normDate(_r0[_k]));
+        break;
+      }
+    }
+    const _withDt = rows.filter(r => { for(let k of _dk) if(r[k]) return true; return false; }).length;
+    console.log('Rows WITH date col:', _withDt, '/ total:', rows.length);
+  } catch(_e) { console.log('DATE DEBUG ERR:', _e.message); }
   // ────────────────────────────────────────────────────
 
   const pins = [];
@@ -775,21 +784,7 @@ function processRaw(rows) {
     const qr      = fv(r, ['QRTRUSTPAY','QRTrustPay','QR TRUSTPAY','qr','trustpay']);
     const staff   = fv(r, ['ພະນັກງານຜູ້ລະດົມ','ພະນກງານຜູລະດມ','staff','ພະນັກງານ']);
     const staffId = fv(r, ['ລະຫັດພະນັກງານ','ລະຫດພະນກງານ','staff_id','staffid','ລະຫັດ']);
-    // Date: try many name variants, then scan all keys for 'ວນທ'/'date' substring
-    let date = fv(r, [
-      'ວັນທີ','ວັນທີ່','ວັນທີ​','ວນທ','ວນທ',
-      'ວັນທີເດືອນປີ','ວັນທີ່ເດືອນປີ','ວນທເດອນປ',
-      'date','Date','DATE','ວັນທີ​ເດືອນ​ປີ',
-    ]);
-    if (!date) {
-      for (const _k of Object.keys(r)) {
-        const _kn = _k.replace(/[\s​‌‍ ﻿]/g,'').toLowerCase();
-        if (_kn.includes('ວນທ') || _kn.includes('date')) {
-          const _v = String(r[_k] || '');
-          if (_v && normDate(_v)) { date = _v; break; }
-        }
-      }
-    }
+    const date    = fv(r, ['ວັນທີເດືອນປີ','ວນທເດອນປ','date','ວັນທີ']);
 
     pins.push({
       lat: parseFloat((cnt>1?jitter(la0, 0.0003 * Math.sqrt(cnt)):la0).toFixed(6)),
