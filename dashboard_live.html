@@ -734,14 +734,21 @@ function processRaw(rows) {
     return true;
   });
   console.log('After dedup:', rows.length, 'rows');
-  // ── DATE DEBUG: log first 5 raw date values ──────────
-  const _dateKeys = ['ວັນທີເດືອນປີ','ວນທເດອນປ','date','ວັນທີ'];
-  let _sampleDates = rows.slice(0,10).map(r => {
-    const raw = _dateKeys.map(k => r[k]).find(v => v !== undefined && v !== '');
-    return { raw: raw, type: typeof raw, norm: normDate(raw) };
-  });
-  console.log('DATE SAMPLES (raw→norm):', JSON.stringify(_sampleDates));
-  // ─────────────────────────────────────────────────────
+  // ── DATE DEBUG ─────────────────────────────────────
+  try {
+    const _r0 = rows[0] || {};
+    console.log('COLUMN KEYS:', Object.keys(_r0).join(' | ').slice(0,300));
+    const _dk = ['ວັນທີເດືອນປີ','ວນທເດອນປ','ວັນທີ','date'];
+    for (let _k of _dk) {
+      if (_r0[_k] !== undefined) {
+        console.log('DATE COL:', _k, '| RAW:', _r0[_k], '| TYPE:', typeof _r0[_k], '| NORM:', normDate(_r0[_k]));
+        break;
+      }
+    }
+    const _withDt = rows.filter(r => { for(let k of _dk) if(r[k]) return true; return false; }).length;
+    console.log('Rows WITH date col:', _withDt, '/ total:', rows.length);
+  } catch(_e) { console.log('DATE DEBUG ERR:', _e.message); }
+  // ────────────────────────────────────────────────────
 
   const pins = [];
   const seen = {};
