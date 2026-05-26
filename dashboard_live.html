@@ -734,14 +734,6 @@ function processRaw(rows) {
     return true;
   });
   console.log('After dedup:', rows.length, 'rows');
-  // ── DATE DEBUG: log first 5 raw date values ──────────
-  const _dateKeys = ['ວັນທີເດືອນປີ','ວນທເດອນປ','date','ວັນທີ'];
-  let _sampleDates = rows.slice(0,10).map(r => {
-    const raw = _dateKeys.map(k => r[k]).find(v => v !== undefined && v !== '');
-    return { raw: raw, type: typeof raw, norm: normDate(raw) };
-  });
-  console.log('DATE SAMPLES (raw→norm):', JSON.stringify(_sampleDates));
-  // ─────────────────────────────────────────────────────
 
   const pins = [];
   const seen = {};
