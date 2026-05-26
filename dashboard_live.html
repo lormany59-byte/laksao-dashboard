@@ -809,7 +809,17 @@ function getFiltered() {
     const selBiz = (document.getElementById('bizFilter')||{}).value||'';
     if (selBiz && p.b !== selBiz) return false;
     if (selVil && p.v !== selVil)            return false;
-    if (p.dt && dFrom && dTo && (p.dt < dFrom || p.dt > dTo)) return false;
+    // Date filter — only exclude when user narrows from default full-range
+    if (dFrom && dTo) {
+      // Detect if user narrowed: compare against default min/max stored on inputs
+      const fEl = document.getElementById('dFrom');
+      const tEl = document.getElementById('dTo');
+      const isDefault = (fEl && fEl.value === fEl.min) && (tEl && tEl.value === tEl.max);
+      if (!isDefault) {
+        if (!p.dt) return false;
+        if (p.dt < dFrom || p.dt > dTo) return false;
+      }
+    }
     return true;
   });
   if (searchMatches) pins = pins.filter(p => searchMatches.has(p));
