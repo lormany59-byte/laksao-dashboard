@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LAKSAO Bank — Live Dashboard</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>LAKSAO Bank — Live Dashboard v2.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -410,6 +413,7 @@ td{padding:5px 7px;border-bottom:1px solid var(--bd)}tr:last-child td{border-bot
         <input class="dinp" type="date" id="dFrom" onchange="updateAll()">
         <span style="color:var(--mu);font-size:.7rem">&#x2192;</span>
         <input class="dinp" type="date" id="dTo" onchange="updateAll()">
+        <span id="dStat" style="font-size:.65rem;color:var(--mu);margin-left:6px"></span>
       </div>
     </div>
   </div>
@@ -768,7 +772,18 @@ function processRaw(rows) {
     const qr      = fv(r, ['QRTRUSTPAY','QRTrustPay','QR TRUSTPAY','qr','trustpay']);
     const staff   = fv(r, ['ພະນັກງານຜູ້ລະດົມ','ພະນກງານຜູລະດມ','staff','ພະນັກງານ']);
     const staffId = fv(r, ['ລະຫັດພະນັກງານ','ລະຫດພະນກງານ','staff_id','staffid','ລະຫັດ']);
-    const date    = fv(r, ['ວັນທີເດືອນປີ','ວນທເດອນປ','date','ວັນທີ']);
+    // Date — try known names; if empty, scan ALL columns for date-like value
+    let date = fv(r, ['ວັນທີເດືອນປີ','ວນທເດອນປ','date','ວັນທີ','ວັນທີ່','timestamp','Timestamp']);
+    if (!date || !normDate(date)) {
+      for (const _k of Object.keys(r)) {
+        if (_k.startsWith('_')) continue;
+        const _v = r[_k];
+        if (!_v && _v !== 0) continue;
+        // Try parse — accept first column whose value normDate handles
+        const _norm = normDate(_v);
+        if (_norm) { date = _v; break; }
+      }
+    }
 
     pins.push({
       lat: parseFloat((cnt>1?jitter(la0, 0.0003 * Math.sqrt(cnt)):la0).toFixed(6)),
@@ -787,9 +802,17 @@ function processRaw(rows) {
       dt:  normDate(date),
     });
   });
-  // Debug: show date parse stats
+  // Date parse stats — display in UI + log
   const _withDt = pins.filter(p => p.dt).length;
-  console.log('[LAKSAO] Date parsed:', _withDt, '/', pins.length, 'pins | sample:', pins.slice(0,3).map(p=>p.dt));
+  console.log('[LAKSAO] Date parsed:', _withDt, '/', pins.length, '| sample:', pins.slice(0,3).map(p=>p.dt));
+  setTimeout(() => {
+    const _stat = document.getElementById('dStat');
+    if (_stat) {
+      const pct = pins.length ? Math.round(_withDt*100/pins.length) : 0;
+      const color = pct > 80 ? 'var(--c4)' : pct > 30 ? 'var(--c5)' : '#ef4444';
+      _stat.innerHTML = '<span style="color:'+color+'">' + _withDt + '/' + pins.length + ' (' + pct + '%)</span>';
+    }
+  }, 100);
   return pins;
 }
 
