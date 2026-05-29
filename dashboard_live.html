@@ -675,23 +675,36 @@ function parseLL(v) {
   return null;
 }
 function normDate(v) {
-  if (!v) return '';
+  if (v === null || v === undefined || v === '') return '';
   try {
-    let d;
+    let yr, mo, dy;
     if (typeof v === 'number') {
-      // Excel serial date
-      d = new Date((v - 25569) * 86400000);
+      const d = new Date((v - 25569) * 86400000);
+      if (isNaN(d.getTime())) return '';
+      yr = d.getUTCFullYear(); mo = d.getUTCMonth()+1; dy = d.getUTCDate();
     } else {
-      // Try parse string date (e.g. "3/15/2025 10:58:47")
-      d = new Date(v);
+      const s = String(v).trim().replace(/[​‌‍ ﻿]/g,'');
+      if (!s) return '';
+      let m;
+      // 1) YYYY-MM-DD or YYYY/MM/DD (incl ISO with time)
+      m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+      if (m) { yr=+m[1]; mo=+m[2]; dy=+m[3]; }
+      else {
+        // 2) D/M/YYYY or D-M-YYYY or D.M.YYYY (Lao/Thai)
+        m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+        if (m) { dy=+m[1]; mo=+m[2]; yr=+m[3]; }
+        else {
+          const d = new Date(s);
+          if (!isNaN(d.getTime())) {
+            yr=d.getFullYear(); mo=d.getMonth()+1; dy=d.getDate();
+          } else return '';
+        }
+      }
     }
-    if (isNaN(d.getTime())) return '';
-    let yr = d.getFullYear();
-    if (yr > 2100) yr -= 543;  // Buddhist calendar
-    if (yr < 2020 || yr > 2030) return '';
-    const mm = String(d.getMonth()+1).padStart(2,'0');
-    const dd = String(d.getDate()).padStart(2,'0');
-    return yr + '-' + mm + '-' + dd;  // YYYY-MM-DD
+    if (yr > 2100) yr -= 543;          // Buddhist → Gregorian
+    if (yr < 2020 || yr > 2035) return '';
+    if (mo < 1 || mo > 12 || dy < 1 || dy > 31) return '';
+    return String(yr)+'-'+String(mo).padStart(2,'0')+'-'+String(dy).padStart(2,'0');
   } catch(e) { return ''; }
 }
 function normStaff(v) {
@@ -774,6 +787,9 @@ function processRaw(rows) {
       dt:  normDate(date),
     });
   });
+  // Debug: show date parse stats
+  const _withDt = pins.filter(p => p.dt).length;
+  console.log('[LAKSAO] Date parsed:', _withDt, '/', pins.length, 'pins | sample:', pins.slice(0,3).map(p=>p.dt));
   return pins;
 }
 
